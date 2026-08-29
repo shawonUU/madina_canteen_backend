@@ -64,13 +64,13 @@ class MenuController extends Controller
 
                 return [
                     'id' => $main->id,
-                    'item_name' => $main->Item_name,
+                    'item_name' => $main->item_name,
                     'item_type' => $main->item_type,
 
                     'alternate' => $alternative
                         ? [
                             'id' => $alternative->id,
-                            'item_name' => $alternative->Item_name,
+                            'item_name' => $alternative->item_name,
                             'item_type' => $alternative->item_type,
                             'alternative_of' => $alternative->alternative_of,
                         ]
@@ -202,13 +202,13 @@ class MenuController extends Controller
 
             return [
                 'id' => $main->id,
-                'item_name' => $main->Item_name,
+                'item_name' => $main->item_name,
                 'item_type' => $main->item_type,
 
                 'alternate' => $alternative
                     ? [
                         'id' => $alternative->id,
-                        'item_name' => $alternative->Item_name,
+                        'item_name' => $alternative->item_name,
                         'item_type' => $alternative->item_type,
                         'alternative_of' => $alternative->alternative_of,
                     ]
