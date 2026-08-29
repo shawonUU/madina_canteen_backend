@@ -6,12 +6,21 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Meal\Models\AdvanceMealBooking;
+use Modules\Meal\Models\EmployeeMeal;
+use Modules\Meal\Models\EmployeeMealItem;
+use Modules\Meal\Models\MealType;
 use Modules\Meal\Models\Menu;
 use Modules\Meal\Models\MenuItem;
-use Modules\Meal\Models\MealType;
 
+use Illuminate\Support\Facades\Auth;
 class MenuController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | INDEX
+    |--------------------------------------------------------------------------
+    */
 
     public function index(Request $request)
     {
@@ -36,7 +45,11 @@ class MenuController extends Controller
             $search = trim($request->search);
 
             $query->whereHas('items', function ($q) use ($search) {
-                $q->where('Item_name', 'like', "%{$search}%");
+                $q->where(
+                    'item_name',
+                    'like',
+                    "%{$search}%"
+                );
             });
         }
 
@@ -55,28 +68,36 @@ class MenuController extends Controller
                 ->where('item_type', 'Main')
                 ->values();
 
-            $menu->items = $mainItems->map(function ($main) use ($items) {
+            $menu->items = $mainItems->map(
+                function ($main) use ($items) {
 
-                $alternative = $items
-                    ->where('item_type', 'Alternative')
-                    ->where('alternative_of', $main->id)
-                    ->first();
+                    $alternative = $items
+                        ->where('item_type', 'Alternative')
+                        ->where(
+                            'alternative_of',
+                            $main->id
+                        )
+                        ->first();
 
-                return [
-                    'id' => $main->id,
-                    'item_name' => $main->item_name,
-                    'item_type' => $main->item_type,
+                    return [
+                        'id' => $main->id,
+                        'item_name' => $main->item_name,
+                        'item_type' => $main->item_type,
 
-                    'alternate' => $alternative
-                        ? [
-                            'id' => $alternative->id,
-                            'item_name' => $alternative->item_name,
-                            'item_type' => $alternative->item_type,
-                            'alternative_of' => $alternative->alternative_of,
-                        ]
-                        : null,
-                ];
-            })->values();
+                        'alternate' => $alternative
+                            ? [
+                                'id' => $alternative->id,
+                                'item_name' =>
+                                    $alternative->item_name,
+                                'item_type' =>
+                                    $alternative->item_type,
+                                'alternative_of' =>
+                                    $alternative->alternative_of,
+                            ]
+                            : null,
+                    ];
+                }
+            )->values();
         });
 
         return response()->json([
@@ -84,6 +105,13 @@ class MenuController extends Controller
             'data' => $menus,
         ]);
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STORE
+    |--------------------------------------------------------------------------
+    */
 
     public function store(Request $request)
     {
@@ -118,6 +146,13 @@ class MenuController extends Controller
             ],
         ]);
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check duplicate menu
+        |--------------------------------------------------------------------------
+        */
+
         $alreadyExists = Menu::query()
             ->whereDate(
                 'menu_date',
@@ -138,34 +173,77 @@ class MenuController extends Controller
         }
 
 
-        $menu = DB::transaction(function () use ($validated, $request) {
+        /*
+        |--------------------------------------------------------------------------
+        | Create Menu
+        |--------------------------------------------------------------------------
+        */
+
+        $menu = DB::transaction(function () use ($validated) {
 
             $menu = Menu::create([
-                'menu_date' => $validated['menu_date'],
-                'meal_type_id' => $validated['meal_type_id'],
-                'created_by' => auth()->id(),
+                'menu_date' =>
+                    $validated['menu_date'],
+
+                'meal_type_id' =>
+                    $validated['meal_type_id'],
+
+                'created_by' =>
+                    auth()->id(),
             ]);
+
 
             foreach ($validated['items'] as $item) {
 
                 $mainItem = MenuItem::create([
-                    'menu_id' => $menu->id,
-                    'Item_name' => trim($item['item_name']),
-                    'item_type' => 'Main',
-                    'alternative_of' => null,
+                    'menu_id' =>
+                        $menu->id,
+
+                    'item_name' =>
+                        trim(
+                            $item['item_name']
+                        ),
+
+                    'item_type' =>
+                        'Main',
+
+                    'alternative_of' =>
+                        null,
                 ]);
 
+
+                /*
+                |--------------------------------------------------------------------------
+                | Alternative Item
+                |--------------------------------------------------------------------------
+                */
+
                 if (
-                    !empty($item['alternate_item_name']) &&
-                    trim($item['alternate_item_name']) !== ''
+                    !empty(
+                        $item['alternate_item_name']
+                    )
+                    &&
+                    trim(
+                        $item['alternate_item_name']
+                    ) !== ''
                 ) {
+
                     MenuItem::create([
-                        'menu_id' => $menu->id,
-                        'Item_name' => trim(
-                            $item['alternate_item_name']
-                        ),
-                        'item_type' => 'Alternative',
-                        'alternative_of' => $mainItem->id,
+                        'menu_id' =>
+                            $menu->id,
+
+                        'item_name' =>
+                            trim(
+                                $item[
+                                    'alternate_item_name'
+                                ]
+                            ),
+
+                        'item_type' =>
+                            'Alternative',
+
+                        'alternative_of' =>
+                            $mainItem->id,
                     ]);
                 }
             }
@@ -175,46 +253,93 @@ class MenuController extends Controller
         });
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | AUTO CREATE EMPLOYEE MEALS FROM ADVANCE BOOKINGS
+        |--------------------------------------------------------------------------
+        */
+
+        $this->createAdvanceBookingsForMenu($menu);
+
+
         return response()->json([
             'success' => true,
-            'message' => 'Menu created successfully.',
-            'data' => $menu->load('mealType'),
+
+            'message' =>
+                'Menu created successfully.',
+
+            'data' =>
+                $menu->load('mealType'),
         ], 201);
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SHOW
+    |--------------------------------------------------------------------------
+    */
 
     public function show(Menu $menu)
     {
         $items = MenuItem::query()
-            ->where('menu_id', $menu->id)
+            ->where(
+                'menu_id',
+                $menu->id
+            )
             ->orderBy('id')
             ->get();
 
         $mainItems = $items
-            ->where('item_type', 'Main')
+            ->where(
+                'item_type',
+                'Main'
+            )
             ->values();
 
-        $menu->items = $mainItems->map(function ($main) use ($items) {
+        $menu->items = $mainItems->map(
+            function ($main) use ($items) {
 
-            $alternative = $items
-                ->where('item_type', 'Alternative')
-                ->where('alternative_of', $main->id)
-                ->first();
+                $alternative = $items
+                    ->where(
+                        'item_type',
+                        'Alternative'
+                    )
+                    ->where(
+                        'alternative_of',
+                        $main->id
+                    )
+                    ->first();
 
-            return [
-                'id' => $main->id,
-                'item_name' => $main->item_name,
-                'item_type' => $main->item_type,
+                return [
+                    'id' =>
+                        $main->id,
 
-                'alternate' => $alternative
-                    ? [
-                        'id' => $alternative->id,
-                        'item_name' => $alternative->item_name,
-                        'item_type' => $alternative->item_type,
-                        'alternative_of' => $alternative->alternative_of,
-                    ]
-                    : null,
-            ];
-        })->values();
+                    'item_name' =>
+                        $main->item_name,
+
+                    'item_type' =>
+                        $main->item_type,
+
+                    'alternate' =>
+                        $alternative
+                            ? [
+                                'id' =>
+                                    $alternative->id,
+
+                                'item_name' =>
+                                    $alternative->item_name,
+
+                                'item_type' =>
+                                    $alternative->item_type,
+
+                                'alternative_of' =>
+                                    $alternative->alternative_of,
+                            ]
+                            : null,
+                ];
+            }
+        )->values();
 
         $menu->load('mealType');
 
@@ -224,8 +349,15 @@ class MenuController extends Controller
         ]);
     }
 
-    public function update(Request $request, Menu $menu)
-    {
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE
+    |--------------------------------------------------------------------------
+    */
+
+    public function update( Request $request, Menu $menu ) {
+
         $validated = $request->validate([
             'menu_date' => [
                 'required',
@@ -267,6 +399,13 @@ class MenuController extends Controller
             ],
         ]);
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check Duplicate Menu
+        |--------------------------------------------------------------------------
+        */
+
         $duplicate = Menu::query()
             ->whereDate(
                 'menu_date',
@@ -292,113 +431,306 @@ class MenuController extends Controller
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Store Old Menu Information
+        |--------------------------------------------------------------------------
+        |
+        | We need the old date + meal type because admin may change:
+        |
+        | 01 Sep Lunch
+        |        ↓
+        | 02 Sep Dinner
+        |
+        */
+
+        $oldMenuDate = $menu->menu_date instanceof \Carbon\Carbon
+            ? $menu->menu_date->format('Y-m-d')
+            : substr(
+                (string) $menu->menu_date,
+                0,
+                10
+            );
+
+        $oldMealTypeId =
+            (int) $menu->meal_type_id;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update Menu + Items
+        |--------------------------------------------------------------------------
+        */
+
         DB::transaction(function () use (
             $validated,
             $menu
         ) {
 
             $menu->update([
-                'menu_date' => $validated['menu_date'],
-                'meal_type_id' => $validated['meal_type_id'],
+                'menu_date' =>
+                    $validated['menu_date'],
+
+                'meal_type_id' =>
+                    $validated['meal_type_id'],
             ]);
 
+
+            /*
+            |--------------------------------------------------------------------------
+            | Existing Main Items
+            |--------------------------------------------------------------------------
+            */
+
             $existingMainIds = MenuItem::query()
-                ->where('menu_id', $menu->id)
-                ->where('item_type', 'Main')
+                ->where(
+                    'menu_id',
+                    $menu->id
+                )
+                ->where(
+                    'item_type',
+                    'Main'
+                )
                 ->pluck('id')
                 ->toArray();
 
-            $submittedMainIds = collect($validated['items'])
+
+            /*
+            |--------------------------------------------------------------------------
+            | Submitted Main Items
+            |--------------------------------------------------------------------------
+            */
+
+            $submittedMainIds = collect(
+                $validated['items']
+            )
                 ->pluck('id')
                 ->filter()
-                ->map(fn ($id) => (int) $id)
+                ->map(
+                    fn ($id) =>
+                        (int) $id
+                )
                 ->toArray();
 
 
+            /*
+            |--------------------------------------------------------------------------
+            | Delete Removed Main Items
+            |--------------------------------------------------------------------------
+            */
 
             $removedMainIds = array_diff(
                 $existingMainIds,
                 $submittedMainIds
             );
 
-            foreach ($removedMainIds as $removedMainId) {
+
+            foreach (
+                $removedMainIds
+                as $removedMainId
+            ) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Delete Alternative
+                |--------------------------------------------------------------------------
+                */
 
                 MenuItem::query()
-                    ->where('alternative_of', $removedMainId)
+                    ->where(
+                        'alternative_of',
+                        $removedMainId
+                    )
                     ->delete();
 
+
+                /*
+                |--------------------------------------------------------------------------
+                | Delete Main
+                |--------------------------------------------------------------------------
+                */
+
                 MenuItem::query()
-                    ->where('id', $removedMainId)
-                    ->where('menu_id', $menu->id)
+                    ->where(
+                        'id',
+                        $removedMainId
+                    )
+                    ->where(
+                        'menu_id',
+                        $menu->id
+                    )
                     ->delete();
             }
 
-            foreach ($validated['items'] as $item) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Create / Update Items
+            |--------------------------------------------------------------------------
+            */
+
+            foreach (
+                $validated['items']
+                as $item
+            ) {
 
                 $mainItem = null;
 
 
-                if (!empty($item['id'])) {
+                /*
+                |--------------------------------------------------------------------------
+                | Find Existing Main Item
+                |--------------------------------------------------------------------------
+                */
 
-                    $mainItem = MenuItem::query()
-                        ->where('id', $item['id'])
-                        ->where('menu_id', $menu->id)
-                        ->where('item_type', 'Main')
-                        ->first();
+                if (
+                    !empty(
+                        $item['id']
+                    )
+                ) {
+
+                    $mainItem =
+                        MenuItem::query()
+                            ->where(
+                                'id',
+                                $item['id']
+                            )
+                            ->where(
+                                'menu_id',
+                                $menu->id
+                            )
+                            ->where(
+                                'item_type',
+                                'Main'
+                            )
+                            ->first();
                 }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Create New Main Item
+                |--------------------------------------------------------------------------
+                */
 
                 if (!$mainItem) {
 
-                    $mainItem = MenuItem::create([
-                        'menu_id' => $menu->id,
-                        'Item_name' => trim($item['item_name']),
-                        'item_type' => 'Main',
-                        'alternative_of' => null,
-                    ]);
+                    $mainItem =
+                        MenuItem::create([
+                            'menu_id' =>
+                                $menu->id,
+
+                            'item_name' =>
+                                trim(
+                                    $item[
+                                        'item_name'
+                                    ]
+                                ),
+
+                            'item_type' =>
+                                'Main',
+
+                            'alternative_of' =>
+                                null,
+                        ]);
+
                 } else {
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Update Existing Main Item
+                    |--------------------------------------------------------------------------
+                    */
+
                     $mainItem->update([
-                        'Item_name' => trim($item['item_name']),
+                        'item_name' =>
+                            trim(
+                                $item[
+                                    'item_name'
+                                ]
+                            ),
                     ]);
                 }
 
-                $alternative = MenuItem::query()
-                    ->where('menu_id', $menu->id)
-                    ->where('item_type', 'Alternative')
-                    ->where(
-                        'alternative_of',
-                        $mainItem->id
+
+                /*
+                |--------------------------------------------------------------------------
+                | Find Alternative
+                |--------------------------------------------------------------------------
+                */
+
+                $alternative =
+                    MenuItem::query()
+                        ->where(
+                            'menu_id',
+                            $menu->id
+                        )
+                        ->where(
+                            'item_type',
+                            'Alternative'
+                        )
+                        ->where(
+                            'alternative_of',
+                            $mainItem->id
+                        )
+                        ->first();
+
+
+                $alternateName =
+                    isset(
+                        $item[
+                            'alternate_item_name'
+                        ]
                     )
-                    ->first();
+                        ? trim(
+                            $item[
+                                'alternate_item_name'
+                            ]
+                        )
+                        : '';
 
 
-                $alternateName = isset(
-                    $item['alternate_item_name']
-                )
-                    ? trim($item['alternate_item_name'])
-                    : '';
+                /*
+                |--------------------------------------------------------------------------
+                | Create / Update Alternative
+                |--------------------------------------------------------------------------
+                */
 
-
-                if ($alternateName !== '') {
+                if (
+                    $alternateName !== ''
+                ) {
 
                     if ($alternative) {
 
-
                         $alternative->update([
-                            'Item_name' => $alternateName,
+                            'item_name' =>
+                                $alternateName,
                         ]);
 
                     } else {
 
                         MenuItem::create([
-                            'menu_id' => $menu->id,
-                            'Item_name' => $alternateName,
-                            'item_type' => 'Alternative',
-                            'alternative_of' => $mainItem->id,
+                            'menu_id' =>
+                                $menu->id,
+
+                            'item_name' =>
+                                $alternateName,
+
+                            'item_type' =>
+                                'Alternative',
+
+                            'alternative_of' =>
+                                $mainItem->id,
                         ]);
                     }
 
                 } else {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Remove Alternative
+                    |--------------------------------------------------------------------------
+                    */
 
                     if ($alternative) {
                         $alternative->delete();
@@ -408,37 +740,144 @@ class MenuController extends Controller
         });
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | MENU DATE / MEAL TYPE CHANGED
+        |--------------------------------------------------------------------------
+        */
+
+        $newMenuDate =
+            $validated['menu_date'];
+
+        $newMealTypeId =
+            (int) $validated['meal_type_id'];
+
+
+        if (
+            $oldMenuDate !== $newMenuDate ||
+            $oldMealTypeId !== $newMealTypeId
+        ) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Remove Old Generated Employee Meals
+            |--------------------------------------------------------------------------
+            */
+
+            EmployeeMeal::query()
+                ->where(
+                    'menu_id',
+                    $menu->id
+                )
+                ->where(
+                    'meal_type_id',
+                    $oldMealTypeId
+                )
+                ->whereDate(
+                    'booking_date',
+                    $oldMenuDate
+                )
+                ->delete();
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Sync Current Menu With Advance Bookings
+        |--------------------------------------------------------------------------
+        */
+
+        $this->createAdvanceBookingsForMenu( $menu->fresh() );
+
+
         return response()->json([
             'success' => true,
-            'message' => 'Menu updated successfully.',
-            'data' => $menu->fresh()->load('mealType'),
+
+            'message' =>
+                'Menu updated successfully.',
+
+            'data' =>
+                $menu
+                    ->fresh()
+                    ->load('mealType'),
         ]);
     }
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | DESTROY
+    |--------------------------------------------------------------------------
+    */
+
     public function destroy(Menu $menu)
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Remove Actual Employee Meals
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | Advance bookings are NOT deleted.
+        |
+        */
+
+        EmployeeMeal::query()
+            ->where(
+                'menu_id',
+                $menu->id
+            )
+            ->delete();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Delete Menu Items + Menu
+        |--------------------------------------------------------------------------
+        */
+
         DB::transaction(function () use ($menu) {
+
             MenuItem::query()
-                ->where('menu_id', $menu->id)
+                ->where(
+                    'menu_id',
+                    $menu->id
+                )
                 ->delete();
+
             $menu->delete();
         });
 
 
         return response()->json([
             'success' => true,
-            'message' => 'Menu deleted successfully.',
+
+            'message' =>
+                'Menu deleted successfully. Advance bookings have been preserved.',
         ]);
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | TODAY MENUS
+    |--------------------------------------------------------------------------
+    */
+
     public function todayMenus(Request $request)
     {
-        $today = now()->toDateString();
+        $today =
+            now()->toDateString();
 
         $menus = Menu::query()
-            ->with(['mealType', 'items'])
-            ->whereDate('menu_date', $today)
+            ->with([
+                'mealType',
+                'items',
+            ])
+            ->whereDate(
+                'menu_date',
+                $today
+            )
             ->get();
 
         return response()->json([
@@ -446,4 +885,182 @@ class MenuController extends Controller
             'data' => $menus,
         ]);
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CREATE EMPLOYEE MEALS FROM ADVANCE BOOKINGS
+    |--------------------------------------------------------------------------
+    |
+    | This method is called automatically when:
+    |
+    | 1. New menu is created
+    | 2. Existing menu is updated
+    |
+    | Advance booking remains permanent.
+    |
+    */
+
+    private function createAdvanceBookingsForMenu( Menu $menu ): void {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get Active Advance Bookings
+        |--------------------------------------------------------------------------
+        */
+        // dd($menu);
+
+        $mealType = MealType::query()->find($menu->meal_type_id);
+
+        $advanceBookings =
+            AdvanceMealBooking::query()
+                ->whereDate(
+                    'booking_date',
+                    $menu->menu_date
+                )
+                ->where(
+                    'meal_type_id',
+                    $menu->meal_type_id
+                )
+                ->where(
+                    'status',
+                    'Booked'
+                )
+                ->get();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create Employee Meal
+        |--------------------------------------------------------------------------
+        */
+
+        // dd($advanceBookings);
+
+        foreach (
+            $advanceBookings
+            as $advanceBooking
+        ) {
+            
+
+            /*
+            |--------------------------------------------------------------------------
+            | Prevent Duplicate Booking
+            |--------------------------------------------------------------------------
+            */
+
+            $employeeMeal =
+                EmployeeMeal::firstOrCreate(
+                    [
+                        'employee_id' =>
+                            $advanceBooking->employee_id,
+
+                        'menu_id' =>
+                            $menu->id,
+
+                        'meal_type_id' =>
+                            $menu->meal_type_id,
+
+                        'meal_date' =>
+                            $menu->menu_date,
+
+                            'total_amount' =>
+                                $mealType->meal_rate,
+                    ],
+                    [
+                        'status' => 'Selected',
+                    ]
+                );
+
+            EmployeeMealItem::where(
+                    'employee_meal_id',
+                    $employeeMeal->id
+                )->delete();
+
+                
+
+            foreach ( $menu->items as $item ) {
+
+                if($item->item_type === 'Alternative') { continue; }
+
+                EmployeeMealItem::create([
+                    'employee_meal_id' =>
+                        $employeeMeal->id,
+
+                    'menu_item_id' =>
+                        $item->id,
+                    'created_by' => Auth::user()->id,
+                ]);
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | If Employee Meal Already Exists
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $employeeMeal->status !== 'Cancelled'
+            ) {
+
+                $employeeMeal->update([
+                    'status' =>
+                        'Selected',
+                ]);
+            }
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Remove Employee Meals For Cancelled
+        | Advance Bookings
+        |--------------------------------------------------------------------------
+        */
+
+        $cancelledEmployeeIds =
+            AdvanceMealBooking::query()
+                ->whereDate(
+                    'booking_date',
+                    $menu->menu_date
+                )
+                ->where(
+                    'meal_type_id',
+                    $menu->meal_type_id
+                )
+                ->where(
+                    'status',
+                    'Cancelled'
+                )
+                ->pluck(
+                    'employee_id'
+                );
+
+
+        if (
+            $cancelledEmployeeIds->isNotEmpty()
+        ) {
+
+            EmployeeMeal::query()
+                ->where(
+                    'menu_id',
+                    $menu->id
+                )
+                ->where(
+                    'meal_type_id',
+                    $menu->meal_type_id
+                )
+                ->whereDate(
+                    'meal_date',
+                    $menu->menu_date
+                )
+                ->whereIn(
+                    'employee_id',
+                    $cancelledEmployeeIds
+                )
+                ->delete();
+        }
+    }
 }
+
