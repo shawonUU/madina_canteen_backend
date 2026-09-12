@@ -15,6 +15,7 @@ class MealDatabaseSeeder extends Seeder
         $mealTypes = [
             [
                 'name' => 'Breakfast',
+                'slug' => 'breakfast',
                 'description' => 'Morning meal',
                 'booking_cutoff_time' => '08:00:00',
                 'meal_rate' => 50.00,
@@ -22,6 +23,7 @@ class MealDatabaseSeeder extends Seeder
             ],
             [
                 'name' => 'Lunch',
+                'slug' => 'lunch',
                 'description' => 'Afternoon meal',
                 'booking_cutoff_time' => '11:00:00',
                 'meal_rate' => 50.00,
@@ -29,6 +31,7 @@ class MealDatabaseSeeder extends Seeder
             ],
             [
                 'name' => 'Dinner',
+                'slug' => 'dinner',
                 'description' => 'Evening meal',
                 'booking_cutoff_time' => '18:00:00',
                 'meal_rate' => 50.00,

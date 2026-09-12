@@ -14,11 +14,10 @@ return new class extends Migration
         Schema::create('menus', function(Blueprint $table){
             $table->id();
             $table->date('menu_date');
-            $table->bigInteger('meal_type_id')
-                ->constrained('meal_types');
-            $table->bigInteger('created_by')
-                ->nullable();
+            $table->bigInteger('meal_type_id')->constrained('meal_types');
+            $table->bigInteger('created_by')->nullable();
             $table->timestamps();
+            $table->unique([ 'menu_date', 'meal_type_id', ]);
         });
     }
 

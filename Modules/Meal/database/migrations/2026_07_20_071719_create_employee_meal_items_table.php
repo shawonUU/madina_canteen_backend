@@ -6,35 +6,18 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::create('employee_meal_items', function(Blueprint $table){
-
+        Schema::create('employee_meal_items', function (Blueprint $table) {
             $table->id();
-
-
-            $table->bigInteger('employee_meal_id')
-                ->constrained('employee_meals');
-
-
-            $table->bigInteger('menu_item_id');
-
-
-            $table->bigInteger('created_by')
-                ->nullable();
-
-
+            $table->foreignId('employee_meal_id')->constrained('employee_meals')->cascadeOnDelete();
+            $table->foreignId('menu_item_id')->constrained('menu_items')->cascadeOnDelete();
+            $table->foreignId('created_by')->nullable();
             $table->timestamps();
-
+            $table->unique(['employee_meal_id','menu_item_id',]);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('employee_meal_items');

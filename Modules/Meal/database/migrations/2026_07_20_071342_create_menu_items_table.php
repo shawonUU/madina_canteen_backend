@@ -12,33 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('menu_items', function(Blueprint $table){
-
             $table->id();
-
-
-            $table->bigInteger('menu_id')
-                ->constrained('menus')
-                ->cascadeOnDelete();
-
-
+            $table->bigInteger('menu_id')->constrained('menus')->cascadeOnDelete();
             $table->string('name');
-
-
-            $table->enum('item_type',[
-                'Main',
-                'Alternative'
-            ])
-            ->default('Main');
-
-
-            $table->foreignId('alternative_of')
-                ->nullable()
-                ->constrained('menu_items')
-                ->nullOnDelete();
-
-
+            $table->enum('item_type',['Main','Alternative' ])->default('Main');
+            $table->foreignId('alternative_of')->nullable()->constrained('menu_items')->nullOnDelete();
             $table->timestamps();
-
+            $table->index(['menu_id','item_type',]);
         });
     }
 
