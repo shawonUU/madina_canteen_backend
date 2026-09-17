@@ -31,7 +31,8 @@ class RoleController extends Controller
 
 
         $role = Role::create([
-            'name'=>$request->name
+            'name'=>$request->name,
+            'guard_name' => 'sanctum',
         ]);
 
 
@@ -67,7 +68,8 @@ class RoleController extends Controller
 
 
         $role->update([
-            'name'=>$request->name
+            'name'=>$request->name,
+            'guard_name' => 'sanctum',
         ]);
 
 

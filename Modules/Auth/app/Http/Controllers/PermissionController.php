@@ -27,7 +27,8 @@ class PermissionController extends Controller
 
 
         $permission = Permission::create([
-            'name' => $request->name
+            'name' => $request->name,
+            'guard_name' => 'sanctum',
         ]);
 
 
@@ -50,7 +51,8 @@ class PermissionController extends Controller
 
 
         $permission->update([
-            'name' => $request->name
+            'name' => $request->name,
+            'guard_name' => 'sanctum',
         ]);
 
 

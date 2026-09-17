@@ -1,52 +1,340 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+namespace Modules\Employee\Http\Controllers;
 
-return new class extends Migration
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Modules\Employee\Models\Employee;
+use Spatie\Permission\Models\Role;
+
+class EmployeeController extends Controller
 {
     /**
-     * Run the migrations.
+     * Display a listing of employees.
      */
-    public function up(): void
+    public function index(Request $request)
     {
-        Schema::create('employees', function(Blueprint $table){
-
-            $table->id();
-
-            $table->string('employee_code')
-                ->unique();
-
-            $table->string('name');
-
-            $table->string('department')
-                ->nullable();
-
-            $table->string('designation')
-                ->nullable();
-
-            $table->string('phone')
-                ->nullable();
-
-            $table->string('email')
-                ->nullable();
-
-            $table->enum('status',[
-                'Active',
-                'Inactive'
-            ])->default('Active');
-
-            $table->timestamps();
-
-        });
+        $employees = Employee::with(['user.roles',])->latest()->paginate($request->get('per_page', 15));
+        return response()->json([
+            'success' => true,
+            'message' => 'Employees retrieved successfully.',
+            'data' => $employees,
+        ]);
     }
 
     /**
-     * Reverse the migrations.
+     * Store a newly created employee.
      */
-    public function down(): void
+    public function store(Request $request)
     {
-        Schema::dropIfExists('employees');
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'department' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'designation' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'phone' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'email' => [
+                'required_if:create_user,true',
+                'nullable',
+                'email',
+                'max:255',
+                'unique:users,email',
+            ],
+
+            'status' => [
+                'nullable',
+                Rule::in([
+                    'Active',
+                    'Inactive',
+                ]),
+            ],
+
+            'create_user' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'user_password' => [
+                'required_if:create_user,true',
+                'nullable',
+                'string',
+                'min:6',
+            ],
+
+            'role_id' => [
+                'required_if:create_user,true',
+                'nullable',
+                'integer',
+                'exists:roles,id',
+            ],
+        ]);
+
+        $employee = DB::transaction(function () use ($validated) {
+
+            $employee = Employee::create([
+                'name' => $validated['name'],
+                'department' => $validated['department'] ?? null,
+                'designation' => $validated['designation'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'email' => $validated['email'] ?? null,
+                'status' => $validated['status'] ?? 'Active',
+            ]);
+
+            $employee->update([
+                'employee_code' => 'EMP-' .
+                    str_pad($employee->id, 6, '0', STR_PAD_LEFT),
+            ]);
+
+            if (!empty($validated['create_user'])) {
+
+                $user = User::create([
+                    'employee_id' => $employee->id,
+                    'name' => $employee->name,
+                    'email' => $employee->email,
+                    'password' => Hash::make(
+                        $validated['user_password']
+                    ),
+                    'status' => 'Active',
+                ]);
+
+                $role = Role::findOrFail($validated['role_id']);
+
+                $user->assignRole($role);
+            }
+
+            return $employee;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Employee created successfully.',
+            'data' => $employee->fresh()->load('user.roles'),
+        ], 201);
     }
-};
+
+    /**
+     * Display the specified employee.
+     */
+    public function show($id)
+    {
+        $employee = Employee::with([
+            'user.roles',
+        ])->find($id);
+
+        if (!$employee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Employee not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Employee retrieved successfully.',
+            'data' => $employee,
+        ]);
+    }
+
+    /**
+     * Update the specified employee.
+     */
+    public function update(Request $request, $id)
+    {
+        $employee = Employee::with([
+            'user.roles',
+        ])->find($id);
+
+        if (!$employee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Employee not found.',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'department' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'designation' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'phone' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'email' => [
+                'required_if:create_user,true',
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')
+                    ->ignore($employee->user?->id),
+            ],
+
+            'status' => [
+                'nullable',
+                Rule::in([
+                    'Active',
+                    'Inactive',
+                ]),
+            ],
+
+            'create_user' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'user_password' => [
+                'nullable',
+                'string',
+                'min:6',
+            ],
+
+            'role_id' => [
+                'required_if:create_user,true',
+                'nullable',
+                'integer',
+                'exists:roles,id',
+            ],
+        ]);
+
+        DB::transaction(function () use ($validated, $employee) {
+
+            $employee->update([
+                'name' => $validated['name'],
+                'department' => $validated['department'] ?? null,
+                'designation' => $validated['designation'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'email' => $validated['email'] ?? null,
+                'status' => $validated['status'] ?? 'Active',
+            ]);
+
+            $createUser = !empty($validated['create_user']);
+
+            if ($createUser) {
+
+                if ($employee->user) {
+
+                    $user = $employee->user;
+
+                    $userData = [
+                        'name' => $employee->name,
+                        'email' => $employee->email,
+                        'status' => 'Active',
+                    ];
+
+                    if (!empty($validated['user_password'])) {
+                        $userData['password'] = Hash::make(
+                            $validated['user_password']
+                        );
+                    }
+
+                    $user->update($userData);
+
+                    $role = Role::findOrFail(
+                        $validated['role_id']
+                    );
+
+                    $user->syncRoles([$role]);
+
+                } else {
+
+                    $user = User::create([
+                        'employee_id' => $employee->id,
+                        'name' => $employee->name,
+                        'email' => $employee->email,
+                        'password' => Hash::make(
+                            $validated['user_password']
+                        ),
+                        'status' => 'Active',
+                    ]);
+
+                    $role = Role::findOrFail(
+                        $validated['role_id']
+                    );
+
+                    $user->assignRole($role);
+                }
+
+            } elseif ($employee->user) {
+
+                $employee->user->update([
+                    'status' => 'Inactive',
+                ]);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Employee updated successfully.',
+            'data' => $employee->fresh()->load('user.roles'),
+        ]);
+    }
+
+    /**
+     * Remove the specified employee.
+     */
+    public function destroy($id)
+    {
+        $employee = Employee::with('user')->find($id);
+
+        if (!$employee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Employee not found.',
+            ], 404);
+        }
+
+        DB::transaction(function () use ($employee) {
+
+            if ($employee->user) {
+                $employee->user->delete();
+            }
+
+            $employee->delete();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Employee deleted successfully.',
+        ]);
+    }
+}
+
