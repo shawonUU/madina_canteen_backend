@@ -18,7 +18,7 @@ class EmployeeController extends Controller
      */
     public function index(Request $request)
     {
-        $employees = Employee::with('user')
+        $employees = Employee::with('user.roles')
             ->latest()
             ->paginate($request->get('per_page', 15));
 
@@ -77,6 +77,12 @@ class EmployeeController extends Controller
                 'boolean',
             ],
 
+            'role_id' => [
+                'required_if:create_user,true',
+                'nullable',
+                'exists:roles,id',
+            ],
+
             'user_password' => [
                 'required_if:create_user,true',
                 'nullable',
@@ -102,13 +108,16 @@ class EmployeeController extends Controller
             ]);
 
             if (!empty($validated['create_user'])) {
-                User::create([
+                $user = User::create([
                     'employee_id' => $employee->id,
                     'name' => $employee->name,
                     'email' => $employee->email,
                     'password' => Hash::make($validated['user_password']),
                     'status' => 'Active',
                 ]);
+
+                $role = Role::findOrFail($validated['role_id']);
+                $user->assignRole($role);
             }
 
             return $employee;
@@ -201,6 +210,12 @@ class EmployeeController extends Controller
                 'boolean',
             ],
 
+            'role_id' => [
+                'required_if:create_user,true',
+                'nullable',
+                'exists:roles,id',
+            ],
+
             'user_password' => [
                 'nullable',
                 'string',
@@ -223,6 +238,8 @@ class EmployeeController extends Controller
 
             if ($createUser) {
 
+                $user = null;
+
                 if ($employee->user) {
 
                     $userData = [
@@ -238,10 +255,11 @@ class EmployeeController extends Controller
                     }
 
                     $employee->user->update($userData);
+                    $user = $employee->user;
 
                 } else {
 
-                    User::create([
+                    $user = User::create([
                         'employee_id' => $employee->id,
                         'name' => $employee->name,
                         'email' => $employee->email,
@@ -252,11 +270,16 @@ class EmployeeController extends Controller
                     ]);
                 }
 
+                $role = Role::findOrFail($validated['role_id']);
+                $user->syncRoles($role);
+
             } elseif ($employee->user) {
 
                 $employee->user->update([
                     'status' => 'Inactive',
                 ]);
+
+                $employee->user->syncRoles([]);
             }
         });
 
