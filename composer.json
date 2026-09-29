@@ -28,17 +28,17 @@
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/",
 
-            "Modules\\Auth\\": "Modules/Auth/app/",
-            "Modules\\Auth\\Database\\Factories\\": "Modules/Auth/database/factories/",
-            "Modules\\Auth\\Database\\Seeders\\": "Modules/Auth/database/seeders/",
+            "Modules\\Admin\\": "Modules/Admin/app/",
+            "Modules\\Admin\\Database\\Factories\\": "Modules/Admin/database/factories/",
+            "Modules\\Admin\\Database\\Seeders\\": "Modules/Admin/database/seeders/",
 
-            "Modules\\Employee\\": "Modules/Employee/app/",
-            "Modules\\Employee\\Database\\Factories\\": "Modules/Employee/database/factories/",
-            "Modules\\Employee\\Database\\Seeders\\": "Modules/Employee/database/seeders/",
+            "Modules\\HRM\\": "Modules/HRM/app/",
+            "Modules\\HRM\\Database\\Factories\\": "Modules/HRM/database/factories/",
+            "Modules\\HRM\\Database\\Seeders\\": "Modules/HRM/database/seeders/",
 
-            "Modules\\Meal\\": "Modules/Meal/app/",
-            "Modules\\Meal\\Database\\Factories\\": "Modules/Meal/database/factories/",
-            "Modules\\Meal\\Database\\Seeders\\": "Modules/Meal/database/seeders/"
+            "Modules\\Canteen\\": "Modules/Canteen/app/",
+            "Modules\\Canteen\\Database\\Factories\\": "Modules/Canteen/database/factories/",
+            "Modules\\Canteen\\Database\\Seeders\\": "Modules/Canteen/database/seeders/"
         }
     },
     "autoload-dev": {

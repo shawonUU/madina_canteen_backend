@@ -4,7 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Modules\Auth\Models\User;
+use Modules\Admin\Models\User;
 use Modules\Meal\Database\Seeders\MealDatabaseSeeder;
 
 use Illuminate\Support\Facades\Hash;

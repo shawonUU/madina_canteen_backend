@@ -1,5 +1,5 @@
 {
-    "Auth": true,
-    "Employee": true,
-    "Meal": true
+    "Admin": true,
+    "HRM": true,
+    "Canteen": true
 }
