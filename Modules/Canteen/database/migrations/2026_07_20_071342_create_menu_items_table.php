@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('menu_items', function(Blueprint $table){
             $table->id();
+            $table->string('code')->unique();
             $table->bigInteger('menu_id')->constrained('menus')->cascadeOnDelete();
             $table->string('name');
             $table->enum('item_type',['Main','Alternative' ])->default('Main');

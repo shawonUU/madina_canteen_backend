@@ -14,11 +14,8 @@ return new class extends Migration
         Schema::create('meal_closings', function(Blueprint $table){
 
             $table->id();
-
-
+            $table->string('code')->unique();
             $table->date('meal_date');
-
-
             $table->bigInteger('meal_type_id')
                 ->constrained('meal_types');
 

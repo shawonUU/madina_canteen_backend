@@ -11,11 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('menus', function(Blueprint $table){
+        Schema::create('meal_menus', function(Blueprint $table){
             $table->id();
+            $table->string('code')->unique();
             $table->date('menu_date');
             $table->bigInteger('meal_type_id')->constrained('meal_types');
             $table->bigInteger('created_by')->nullable();
+            $table->enum('status', [ 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed', ])->default('Pending');
             $table->timestamps();
             $table->unique([ 'menu_date', 'meal_type_id', ]);
         });
@@ -26,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('menus');
+        Schema::dropIfExists('meal_menus');
     }
 };

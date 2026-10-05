@@ -18,7 +18,7 @@ class MenuItem extends Model
     public function menu()
     {
         return $this->belongsTo(
-            Menu::class,
+            MealMenu::class,
             'menu_id'
         );
     }

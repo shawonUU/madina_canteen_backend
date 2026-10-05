@@ -5,7 +5,7 @@ namespace Modules\Canteen\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class Menu extends Model
+class MealMenu extends Model
 {
     use HasFactory;
 

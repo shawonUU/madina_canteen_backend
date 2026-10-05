@@ -10,7 +10,7 @@ use Modules\HRM\Models\User;
 use Modules\Canteen\Models\EmployeeMeal;
 use Modules\Canteen\Models\EmployeeMealItem;
 use Modules\Canteen\Models\MealType;
-use Modules\Canteen\Models\Menu;
+use Modules\Canteen\Models\MealMenu;
 
 use Carbon\Carbon;
 class EmployeeMealController extends Controller
@@ -81,7 +81,7 @@ class EmployeeMealController extends Controller
         $menu = null;
 
         if (!empty($validated['menu_id'])) {
-            $menu = Menu::query()
+            $menu = MealMenu::query()
                 ->where('id', $validated['menu_id'])
                 ->where('meal_type_id', $validated['meal_type_id'])
                 ->whereDate('menu_date', $validated['booking_date'])
@@ -200,6 +200,7 @@ class EmployeeMealController extends Controller
             $selectedItemIds
         ) {
             $employeeMeal = EmployeeMeal::create([
+                'code' => getGenerateCode(EmployeeMeal::class, 'code', 'EME', 8),
                 'employee_id' => $validated['employee_id'],
                 'meal_type_id' => $validated['meal_type_id'],
                 'meal_rate' => $mealRate,
@@ -214,6 +215,7 @@ class EmployeeMealController extends Controller
 
             foreach ($selectedItemIds as $menuItemId) {
                 EmployeeMealItem::create([
+                    'code' => getGenerateCode(EmployeeMealItem::class, 'code', 'EMI', 8),
                     'employee_meal_id' => $employeeMeal->id,
                     'menu_item_id' => $menuItemId,
                     'created_by' => auth()->id(),
@@ -403,7 +405,7 @@ class EmployeeMealController extends Controller
             $menu = null;
 
             if (!empty($booking['menu_id'])) {
-                $menu = Menu::query()
+                $menu = MealMenu::query()
                     ->where('id', $booking['menu_id'])
                     ->where('meal_type_id', $validated['meal_type_id'])
                     ->whereDate('menu_date', $bookingDate)
@@ -536,6 +538,7 @@ class EmployeeMealController extends Controller
 
             foreach ($preparedBookings as $booking) {
                 $employeeMeal = EmployeeMeal::create([
+                    'code' => getGenerateCode(EmployeeMeal::class, 'code', 'EME', 8),
                     'employee_id' => $validated['employee_id'],
                     'meal_type_id' => $validated['meal_type_id'],
                     'meal_rate' => $mealRate,
@@ -550,6 +553,7 @@ class EmployeeMealController extends Controller
 
                 foreach ($booking['items'] as $item) {
                     EmployeeMealItem::create([
+                        'code' => getGenerateCode(EmployeeMealItem::class, 'code', 'EMI', 8),
                         'employee_meal_id' => $employeeMeal->id,
                         'menu_item_id' => $item['selected_item_id'],
                         'created_by' => auth()->id(),
@@ -650,7 +654,7 @@ class EmployeeMealController extends Controller
         $menu = null;
 
         if (!empty($validated['menu_id'])) {
-            $menu = Menu::query()
+            $menu = MealMenu::query()
                 ->where('id', $validated['menu_id'])
                 ->where('meal_type_id', $validated['meal_type_id'])
                 ->whereDate('menu_date', $validated['booking_date'])
@@ -779,6 +783,7 @@ class EmployeeMealController extends Controller
 
             foreach ($selectedItemIds as $menuItemId) {
                 EmployeeMealItem::create([
+                    'code' => getGenerateCode(EmployeeMealItem::class, 'code', 'EMI', 8),
                     'employee_meal_id' => $employeeMeal->id,
                     'menu_item_id' => $menuItemId,
                     'created_by' => auth()->id(),

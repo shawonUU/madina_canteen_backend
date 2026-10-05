@@ -73,6 +73,7 @@ class MealRateController extends Controller
         ]);
 
         $mealRate = MealRate::create([
+            'code' => getGenerateCode(MealRate::class, 'code', 'MRT', 8),
             'meal_type_id' => $validated['meal_type_id'],
             'rate' => $validated['rate'],
             'effective_date' => $validated['effective_date'],

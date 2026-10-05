@@ -69,6 +69,7 @@ class AuthController extends Controller
         ]);
 
         $user = User::create([
+            'code' => getGenerateCode(User::class, 'code', 'USR', 8),
             'employee_id' => $request->employee_id,
             'name' => $request->name,
             'email' => $request->email,

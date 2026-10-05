@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('meal_types', function(Blueprint $table){
 
             $table->id();
-
+            $table->string('code')->unique();
             $table->string('name');
             $table->string('slug')->unique();
 

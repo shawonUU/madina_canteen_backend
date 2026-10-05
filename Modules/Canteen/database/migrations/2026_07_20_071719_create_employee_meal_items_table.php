@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('employee_meal_items', function (Blueprint $table) {
             $table->id();
+            $table->string('code')->unique();
             $table->foreignId('employee_meal_id')->constrained('employee_meals')->cascadeOnDelete();
             $table->foreignId('menu_item_id')->constrained('menu_items')->cascadeOnDelete();
             $table->foreignId('created_by')->nullable();

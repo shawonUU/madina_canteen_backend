@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Modules\Canteen\Models\EmployeeMeal;
-use Modules\Canteen\Models\Menu;
+use Modules\Canteen\Models\MealMenu;
 
 class DashboardController extends Controller
 {
@@ -67,7 +67,7 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $menus = Menu::query()
+        $menus = MealMenu::query()
             ->with([
                 'mealType',
                 'items'

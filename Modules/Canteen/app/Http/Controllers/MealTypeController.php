@@ -91,6 +91,7 @@ class MealTypeController extends Controller
 
             // Create Meal Type
             $mealType = MealType::create([
+                'code' => getGenerateCode(MealType::class, 'code', 'MTY', 8),
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
                 'booking_cutoff_time' => $validated['booking_cutoff_time'],
@@ -100,6 +101,7 @@ class MealTypeController extends Controller
 
             // Create initial meal rate history
             MealRate::create([
+                'code' => getGenerateCode(MealRate::class, 'code', 'MRT', 8),
                 'meal_type_id' => $mealType->id,
                 'rate' => $validated['meal_rate'],
                 'status' => 'Active',
@@ -228,6 +230,7 @@ class MealTypeController extends Controller
 
                 // Insert new rate history
                 MealRate::create([
+                    'code' => getGenerateCode(MealRate::class, 'code', 'MRT', 8),
                     'meal_type_id' => $mealType->id,
                     'rate' => $validated['meal_rate'],
                     'status' => 'Active',

@@ -94,7 +94,7 @@ class EmployeeController extends Controller
         $employee = DB::transaction(function () use ($validated) {
 
             $employee = Employee::create([
-                'employee_code' => 'TEMP-' . uniqid(),
+                'code' => getGenerateCode(Employee::class, 'code', 'EMP', 8),
                 'name' => $validated['name'],
                 'department' => $validated['department'] ?? null,
                 'designation' => $validated['designation'] ?? null,
@@ -109,6 +109,7 @@ class EmployeeController extends Controller
 
             if (!empty($validated['create_user'])) {
                 $user = User::create([
+                    'code' => getGenerateCode(User::class, 'code', 'USR', 8),
                     'employee_id' => $employee->id,
                     'name' => $employee->name,
                     'email' => $employee->email,
@@ -260,6 +261,7 @@ class EmployeeController extends Controller
                 } else {
 
                     $user = User::create([
+                        'code' => getGenerateCode(User::class, 'code', 'USR', 8),
                         'employee_id' => $employee->id,
                         'name' => $employee->name,
                         'email' => $employee->email,

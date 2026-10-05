@@ -6,7 +6,7 @@ use Modules\Canteen\Http\Controllers\EmployeeMealController;
 use Modules\Canteen\Http\Controllers\MealRateController;
 use Modules\Canteen\Http\Controllers\MealReportController;
 use Modules\Canteen\Http\Controllers\MealTypeController;
-use Modules\Canteen\Http\Controllers\MenuController;
+use Modules\Canteen\Http\Controllers\MealMenuController;
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -28,12 +28,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('meal-rates/{id}', [MealRateController::class, 'destroy']);
 
     // Menus
-    Route::get('menus', [MenuController::class, 'index']);
-    Route::post('menus', [MenuController::class, 'store']);
-    Route::get('menus/{id}', [MenuController::class, 'show']);
-    Route::put('menus/{id}', [MenuController::class, 'update']);
-    Route::delete('menus/{id}', [MenuController::class, 'destroy']);
-    Route::get('todays-menus', [MenuController::class, 'todayMenus']);
+    Route::get('menus', [MealMenuController::class, 'index']);
+    Route::post('menus', [MealMenuController::class, 'store']);
+    Route::get('menus/{id}', [MealMenuController::class, 'show']);
+    Route::put('menus/{id}', [MealMenuController::class, 'update']);
+    Route::delete('menus/{id}', [MealMenuController::class, 'destroy']);
+    Route::get('todays-menus', [MealMenuController::class, 'todayMenus']);
 
     // Meal Booking
     Route::post('booking-meal', [EmployeeMealController::class, 'bookMeal']);

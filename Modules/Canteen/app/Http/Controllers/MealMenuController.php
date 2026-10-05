@@ -4,17 +4,17 @@ namespace Modules\Canteen\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-// use Modules\Meal\Models\AdvanceMealBooking;
+use Modules\Approval\Services\ApprovalService;
 use Modules\Canteen\Models\EmployeeMeal;
 use Modules\Canteen\Models\EmployeeMealItem;
+use Modules\Canteen\Models\MealMenu;
 use Modules\Canteen\Models\MealType;
-use Modules\Canteen\Models\Menu;
 use Modules\Canteen\Models\MenuItem;
 
-use Illuminate\Support\Facades\Auth;
-class MenuController extends Controller
+class MealMenuController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
@@ -24,7 +24,7 @@ class MenuController extends Controller
 
     public function index(Request $request)
     {
-        $query = Menu::query()
+        $query = MealMenu::query()
             ->with('mealType');
 
         if ($request->filled('menu_date')) {
@@ -153,7 +153,7 @@ class MenuController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $alreadyExists = Menu::query()
+        $alreadyExists = MealMenu::query()
             ->whereDate(
                 'menu_date',
                 $validated['menu_date']
@@ -175,13 +175,14 @@ class MenuController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Create Menu
+        | Create MealMenu
         |--------------------------------------------------------------------------
         */
 
         $menu = DB::transaction(function () use ($validated) {
 
-            $menu = Menu::create([
+            $menu = MealMenu::create([
+                'code' => getGenerateCode(MealMenu::class, 'code', 'MMN', 8),
                 'menu_date' =>
                     $validated['menu_date'],
 
@@ -196,6 +197,7 @@ class MenuController extends Controller
             foreach ($validated['items'] as $item) {
 
                 $mainItem = MenuItem::create([
+                    'code' => getGenerateCode(MenuItem::class, 'code', 'MNI', 8),
                     'menu_id' =>
                         $menu->id,
 
@@ -229,6 +231,7 @@ class MenuController extends Controller
                 ) {
 
                     MenuItem::create([
+                        'code' => getGenerateCode(MenuItem::class, 'code', 'MNI', 8),
                         'menu_id' =>
                             $menu->id,
 
@@ -249,6 +252,10 @@ class MenuController extends Controller
             }
 
 
+            $this->createAdvanceBookingsForMenu($menu);
+
+            app(ApprovalService::class)->submit($menu);
+
             return $menu;
         });
 
@@ -259,14 +266,14 @@ class MenuController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $this->createAdvanceBookingsForMenu($menu);
+       
 
 
         return response()->json([
             'success' => true,
 
             'message' =>
-                'Menu created successfully.',
+                'MealMenu created successfully.',
 
             'data' =>
                 $menu->load('mealType'),
@@ -282,7 +289,7 @@ class MenuController extends Controller
 
 public function show($id)
 {
-    $menu = Menu::with('mealType')->findOrFail($id);
+    $menu = MealMenu::with('mealType')->findOrFail($id);
 
     $items = MenuItem::where('menu_id', $menu->id)
         ->orderBy('id')
@@ -333,7 +340,7 @@ public function show($id)
 
     public function update(Request $request, $id)
     {
-        $menu = Menu::findOrFail($id);
+        $menu = MealMenu::findOrFail($id);
 
         $validated = $request->validate([
             'menu_date' => [
@@ -379,11 +386,11 @@ public function show($id)
 
         /*
         |--------------------------------------------------------------------------
-        | Check Duplicate Menu
+        | Check Duplicate MealMenu
         |--------------------------------------------------------------------------
         */
 
-        $duplicate = Menu::query()
+        $duplicate = MealMenu::query()
             ->whereDate('menu_date', $validated['menu_date'])
             ->where('meal_type_id', $validated['meal_type_id'])
             ->where('id', '!=', $menu->id)
@@ -400,7 +407,7 @@ public function show($id)
 
         /*
         |--------------------------------------------------------------------------
-        | Store Old Menu Information
+        | Store Old MealMenu Information
         |--------------------------------------------------------------------------
         |
         | We need the old date + meal type because admin may change:
@@ -425,7 +432,7 @@ public function show($id)
 
         /*
         |--------------------------------------------------------------------------
-        | Update Menu + Items
+        | Update MealMenu + Items
         |--------------------------------------------------------------------------
         */
 
@@ -584,6 +591,7 @@ public function show($id)
 
                     $mainItem =
                         MenuItem::create([
+                            'code' => getGenerateCode(MenuItem::class, 'code', 'MNI', 8),
                             'menu_id' =>
                                 $menu->id,
 
@@ -677,6 +685,7 @@ public function show($id)
                     } else {
 
                         MenuItem::create([
+                            'code' => getGenerateCode(MenuItem::class, 'code', 'MNI', 8),
                             'menu_id' =>
                                 $menu->id,
 
@@ -750,7 +759,7 @@ public function show($id)
 
         /*
         |--------------------------------------------------------------------------
-        | Sync Current Menu With Advance Bookings
+        | Sync Current MealMenu With Advance Bookings
         |--------------------------------------------------------------------------
         */
 
@@ -761,7 +770,7 @@ public function show($id)
             'success' => true,
 
             'message' =>
-                'Menu updated successfully.',
+                'MealMenu updated successfully.',
 
             'data' =>
                 $menu
@@ -777,7 +786,7 @@ public function show($id)
     |--------------------------------------------------------------------------
     */
 
-    public function destroy(Menu $menu)
+    public function destroy(MealMenu $menu)
     {
         /*
         |--------------------------------------------------------------------------
@@ -799,7 +808,7 @@ public function show($id)
 
         /*
         |--------------------------------------------------------------------------
-        | Delete Menu Items + Menu
+        | Delete MealMenu Items + MealMenu
         |--------------------------------------------------------------------------
         */
 
@@ -820,7 +829,7 @@ public function show($id)
             'success' => true,
 
             'message' =>
-                'Menu deleted successfully. Advance bookings have been preserved.',
+                'MealMenu deleted successfully. Advance bookings have been preserved.',
         ]);
     }
 
@@ -836,7 +845,7 @@ public function show($id)
         $today =
             now()->toDateString();
 
-        $menus = Menu::query()
+        $menus = MealMenu::query()
             ->with([
                 'mealType',
                 'items',
@@ -868,7 +877,7 @@ public function show($id)
     |
     */
 
-    private function createAdvanceBookingsForMenu( Menu $menu ): void {
+    private function createAdvanceBookingsForMenu( MealMenu $menu ): void {
 
         // /*
         // |--------------------------------------------------------------------------
