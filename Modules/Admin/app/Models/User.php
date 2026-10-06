@@ -5,6 +5,7 @@ namespace Modules\Admin\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
+use Modules\Admin\Models\UserAccess;
 use Modules\HRM\Models\Employee;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Traits\HasRoles;
@@ -23,8 +24,8 @@ class User extends Authenticatable
         return $this->belongsTo(Employee::class, 'employee_id', 'id');
     }
 
-    public function userPermissions()
+    public function userAccess()
     {
-        return $this->hasMany(UserPermission::class);
+        return $this->hasMany(UserAccess::class);
     }
 }
