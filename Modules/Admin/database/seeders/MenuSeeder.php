@@ -13,10 +13,15 @@ class MenuSeeder extends Seeder
     {
         $data = [
 
+            /*
+            |--------------------------------------------------------------------------
+            | Approval Management
+            |--------------------------------------------------------------------------
+            */
             [
                 'name' => 'Approval Management',
                 'slug' => 'approval',
-                'icon' => null,
+                'icon' => 'ClipboardCheck',
                 'sort_order' => 1,
                 'is_active' => true,
 
@@ -26,10 +31,21 @@ class MenuSeeder extends Seeder
                         'slug' => 'approval-workflow',
                         'route' => null,
                         'permission' => null,
-                        'icon' => null,
+                        'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
-                        'child_menus' => [],
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Workflow List',
+                                'slug' => 'workflow-list',
+                                'route' => '/approval/workflows',
+                                'permission' => 'approval_workflow.view',
+                                'icon' => 'CircleDot',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                        ],
                     ],
 
                     [
@@ -37,18 +53,34 @@ class MenuSeeder extends Seeder
                         'slug' => 'pending-approval',
                         'route' => null,
                         'permission' => null,
-                        'icon' => null,
+                        'icon' => 'Circle',
                         'sort_order' => 2,
                         'is_active' => true,
-                        'child_menus' => [],
-                    ],
 
+                        'child_menus' => [
+                            [
+                                'name' => 'Pending Approval List',
+                                'slug' => 'pending-approval-list',
+                                'route' => '/approval/pending',
+                                'permission' => 'pending_approval.view',
+                                'icon' => 'CircleDot',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                        ],
+                    ],
                 ],
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Canteen Management
+            |--------------------------------------------------------------------------
+            */
             [
                 'name' => 'Canteen Management',
                 'slug' => 'canteen',
-                'icon' => null,
+                'icon' => 'Utensils',
                 'sort_order' => 2,
                 'is_active' => true,
 
@@ -59,10 +91,21 @@ class MenuSeeder extends Seeder
                         'slug' => 'meal-type',
                         'route' => null,
                         'permission' => null,
-                        'icon' => null,
+                        'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
-                        'child_menus' => [],
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Meal Type List',
+                                'slug' => 'meal-type-list',
+                                'route' => '/canteen/meal-types',
+                                'permission' => 'meal_type.view',
+                                'icon' => 'CircleDot',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                        ],
                     ],
 
                     [
@@ -70,10 +113,21 @@ class MenuSeeder extends Seeder
                         'slug' => 'meal-menu',
                         'route' => null,
                         'permission' => null,
-                        'icon' => null,
+                        'icon' => 'Circle',
                         'sort_order' => 2,
                         'is_active' => true,
-                        'child_menus' => [],
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Meal Menu List',
+                                'slug' => 'meal-menu-list',
+                                'route' => '/canteen/meal-menus',
+                                'permission' => 'meal_menu.view',
+                                'icon' => 'CircleDot',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                        ],
                     ],
 
                     [
@@ -81,10 +135,21 @@ class MenuSeeder extends Seeder
                         'slug' => 'meal-booking',
                         'route' => null,
                         'permission' => null,
-                        'icon' => null,
+                        'icon' => 'Circle',
                         'sort_order' => 3,
                         'is_active' => true,
-                        'child_menus' => [],
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Meal Booking List',
+                                'slug' => 'meal-booking-list',
+                                'route' => '/canteen/meal-bookings',
+                                'permission' => 'meal_booking.view',
+                                'icon' => 'CircleDot',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                        ],
                     ],
 
                     [
@@ -92,18 +157,35 @@ class MenuSeeder extends Seeder
                         'slug' => 'serve-meal',
                         'route' => null,
                         'permission' => null,
-                        'icon' => null,
+                        'icon' => 'Circle',
                         'sort_order' => 4,
                         'is_active' => true,
-                        'child_menus' => [],
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Serve Meal',
+                                'slug' => 'serve-meal-list',
+                                'route' => '/canteen/serve-meal',
+                                'permission' => 'serve_meal.view',
+                                'icon' => 'CircleDot',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                        ],
                     ],
 
                 ],
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Reception Management
+            |--------------------------------------------------------------------------
+            */
             [
                 'name' => 'Reception Management',
                 'slug' => 'reception',
-                'icon' => null,
+                'icon' => 'Building2',
                 'sort_order' => 3,
                 'is_active' => true,
 
@@ -114,7 +196,7 @@ class MenuSeeder extends Seeder
                         'slug' => 'gatepass',
                         'route' => null,
                         'permission' => null,
-                        'icon' => null,
+                        'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
 
@@ -124,20 +206,25 @@ class MenuSeeder extends Seeder
                                 'slug' => 'create-gatepass-request',
                                 'route' => '/reception/gatepass/create-gatepass-request',
                                 'permission' => 'gate_pass.create',
-                                'icon' => null,
+                                'icon' => 'CircleDot',
                                 'sort_order' => 1,
                                 'is_active' => true,
                             ],
-
                         ],
                     ],
 
                 ],
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | HRM
+            |--------------------------------------------------------------------------
+            */
             [
                 'name' => 'HRM',
                 'slug' => 'hrm',
-                'icon' => null,
+                'icon' => 'Users',
                 'sort_order' => 4,
                 'is_active' => true,
 
@@ -148,27 +235,31 @@ class MenuSeeder extends Seeder
                         'slug' => 'employee-management',
                         'route' => null,
                         'permission' => null,
-                        'icon' => null,
+                        'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
 
                         'child_menus' => [
-
                             [
                                 'name' => 'Employee List',
                                 'slug' => 'employee-list',
                                 'route' => '/hrm/employees',
                                 'permission' => 'employee.view',
-                                'icon' => null,
+                                'icon' => 'CircleDot',
                                 'sort_order' => 1,
                                 'is_active' => true,
                             ],
-
                         ],
                     ],
 
                 ],
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Admin
+            |--------------------------------------------------------------------------
+            */
             [
                 'name' => 'Admin',
                 'slug' => 'admin',
@@ -183,7 +274,7 @@ class MenuSeeder extends Seeder
                         'slug' => 'system-management',
                         'route' => null,
                         'permission' => null,
-                        'icon' => 'Settings2',
+                        'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
 
@@ -194,7 +285,7 @@ class MenuSeeder extends Seeder
                                 'slug' => 'module',
                                 'route' => '/admin/modules',
                                 'permission' => 'module.view',
-                                'icon' => 'Boxes',
+                                'icon' => 'CircleDot',
                                 'sort_order' => 1,
                                 'is_active' => true,
                             ],
@@ -204,7 +295,7 @@ class MenuSeeder extends Seeder
                                 'slug' => 'menu',
                                 'route' => '/admin/menus',
                                 'permission' => 'menu.view',
-                                'icon' => 'Menu',
+                                'icon' => 'CircleDot',
                                 'sort_order' => 2,
                                 'is_active' => true,
                             ],
@@ -214,7 +305,7 @@ class MenuSeeder extends Seeder
                                 'slug' => 'child-menu',
                                 'route' => '/admin/child-menus',
                                 'permission' => 'child_menu.view',
-                                'icon' => 'ListTree',
+                                'icon' => 'CircleDot',
                                 'sort_order' => 3,
                                 'is_active' => true,
                             ],
@@ -227,7 +318,7 @@ class MenuSeeder extends Seeder
                         'slug' => 'access-control',
                         'route' => null,
                         'permission' => null,
-                        'icon' => 'ShieldCheck',
+                        'icon' => 'Circle',
                         'sort_order' => 2,
                         'is_active' => true,
 
@@ -238,7 +329,7 @@ class MenuSeeder extends Seeder
                                 'slug' => 'user-access',
                                 'route' => '/admin/user-access',
                                 'permission' => 'user_access.view',
-                                'icon' => null,
+                                'icon' => 'CircleDot',
                                 'sort_order' => 1,
                                 'is_active' => true,
                             ],
@@ -248,8 +339,8 @@ class MenuSeeder extends Seeder
                                 'slug' => 'permission',
                                 'route' => '/admin/permissions',
                                 'permission' => 'permission.view',
-                                'icon' => null,
-                                'sort_order' => 1,
+                                'icon' => 'CircleDot',
+                                'sort_order' => 2,
                                 'is_active' => true,
                             ],
 
@@ -258,8 +349,8 @@ class MenuSeeder extends Seeder
                                 'slug' => 'role',
                                 'route' => '/admin/roles',
                                 'permission' => 'role.view',
-                                'icon' => null,
-                                'sort_order' => 2,
+                                'icon' => 'CircleDot',
+                                'sort_order' => 3,
                                 'is_active' => true,
                             ],
 
@@ -277,7 +368,13 @@ class MenuSeeder extends Seeder
 
             unset($moduleData['menus']);
 
-            $moduleData['code'] = getGenerateCode(Module::class, 'code', 'MOD', 8);
+            $moduleData['code'] = getGenerateCode(
+                Module::class,
+                'code',
+                'MOD',
+                8
+            );
+
             $module = Module::create($moduleData);
 
 
@@ -288,7 +385,13 @@ class MenuSeeder extends Seeder
                 unset($menuData['child_menus']);
 
                 $menuData['module_id'] = $module->id;
-                $menuData['code'] = getGenerateCode(Menu::class, 'code', 'MNU', 8);
+
+                $menuData['code'] = getGenerateCode(
+                    Menu::class,
+                    'code',
+                    'MNU',
+                    8
+                );
 
                 $menu = Menu::create($menuData);
 
@@ -296,7 +399,14 @@ class MenuSeeder extends Seeder
                 foreach ($childMenus as $childMenuData) {
 
                     $childMenuData['menu_id'] = $menu->id;
-                    $childMenuData['code'] = getGenerateCode(ChildMenu::class, 'code', 'CMNU', 8);
+
+                    $childMenuData['code'] = getGenerateCode(
+                        ChildMenu::class,
+                        'code',
+                        'CMNU',
+                        8
+                    );
+
                     ChildMenu::create($childMenuData);
                 }
             }
