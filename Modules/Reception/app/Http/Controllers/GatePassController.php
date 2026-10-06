@@ -175,8 +175,7 @@ class GatePassController extends Controller
             DB::beginTransaction();
 
             $gatePass = GatePass::create([
-                'code' => getGenerateCode(GatePass::class, 'code', 'GPT', 8),
-                'pass_no' => $this->generatePassNo(),
+                'code' => getGenerateCode(GatePass::class, 'code', 'GP'),
 
                 'gate_pass_type' =>
                     $validated['gate_pass_type'],
@@ -207,7 +206,7 @@ class GatePassController extends Controller
             if (!empty($validated['items'])) {
                 foreach ($validated['items'] as $item) {
                     $gatePass->items()->create([
-                        'code' => getGenerateCode(GatePassItem::class, 'code', 'GPI', 8),
+                        'code' => getGenerateCode(GatePassItem::class, 'code', 'GPI'),
                         'product_id' =>
                             $item['product_id'] ?? null,
 
@@ -486,6 +485,10 @@ class GatePassController extends Controller
         $gatePass->load([
             'requester:id,name',
             'items',
+            'approvalRequest.levels' => function ($query) {
+                $query->whereIn('status', ['Approved']);
+            },
+            'approvalRequest.levels.approver:id,name',
         ]);
 
         $pdf = Pdf::loadView(
@@ -503,18 +506,5 @@ class GatePassController extends Controller
         return $pdf->download(
             $gatePass->pass_no . '.pdf'
         );
-    }
-
-    private function generatePassNo(): string
-    {
-        $lastId = GatePass::max('id') ?? 0;
-
-        return 'GP-' . date('Y') . '-' .
-            str_pad(
-                $lastId + 1,
-                5,
-                '0',
-                STR_PAD_LEFT
-            );
     }
 }

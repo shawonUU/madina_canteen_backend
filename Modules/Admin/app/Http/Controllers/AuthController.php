@@ -5,8 +5,9 @@ namespace Modules\Admin\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Modules\Admin\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Modules\Admin\Models\User;
+use Modules\Admin\Models\UserAccess;
 
 class AuthController extends Controller
 {
@@ -85,41 +86,48 @@ class AuthController extends Controller
         ]);
     }
 
-    public function login(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required'
-        ]);
-
-        $user = User::with('employee')->where('email', $request->email)->first();
-
-        if (!$user) {
-            return response()->json([
-                'message' => 'User not found'
-            ], 404);
-        }
-
-        if ($user->status !== 'Active') {
-            return response()->json([
-                'message' => 'User is inactive'
-            ], 403);
-        }
-
-        if (!Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'message' => 'Invalid credentials'
-            ], 401);
-        }
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Login successful',
-            'token' => $token,
-            'user' => $user
-        ]);
-    }
+public function login(Request $request) { 
+    $request->validate([ 
+        'email' => 'required|email', 
+        'password' => 'required', 
+    ]); 
+    $user = User::with('employee') 
+    ->where('email', $request->email) ->first(); 
+    if (!$user) { 
+        return response()->json([ 'message' => 'User not found', ], 404); 
+    } 
+    if ($user->status !== 'Active') { 
+        return response()->json([ 'message' => 'User is inactive', ], 403); 
+    } 
+    if (!Hash::check($request->password, $user->password)) { 
+        return response()->json([ 'message' => 'Invalid credentials', ], 401); 
+    } 
+    $accesses = UserAccess::where('user_id', $user->id) 
+        ->get([ 'id', 'module_id', 'menu_id', 'child_menu_id', 'can_view', 'can_create', 'can_update', 'can_delete', ]) 
+        ->map(function ($permission) { 
+            return [ 
+                'module_id' => $permission->module_id, 
+                'menu_id' => $permission->menu_id, 
+                'child_menu_id' => $permission->child_menu_id, 
+                'can_view' => (bool) $permission->can_view, 
+                'can_create' => (bool) $permission->can_create, 
+                'can_update' => (bool) $permission->can_update, 
+                'can_delete' => (bool) $permission->can_delete,
+            ]; 
+        }) ->values(); 
+    
+    $token = $user->createToken('auth_token')->plainTextToken; 
+    return response()->json([ 
+        'message' => 'Login successful', 
+        'token' => $token, 
+        'user' => [ 'id' => $user->id, 
+        'name' => $user->name, 
+        'email' => $user->email, 
+        'status' => $user->status, 
+        'employee' => $user->employee, ], 
+        'accesses' => $accesses, 
+    ]); 
+}
 
     public function me(Request $request)
     {

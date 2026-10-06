@@ -13,7 +13,7 @@ class MenuSeeder extends Seeder
     {
         $data = [
 
-                        [
+            [
                 'name' => 'Approval Management',
                 'slug' => 'approval',
                 'icon' => null,
@@ -232,6 +232,16 @@ class MenuSeeder extends Seeder
                         'is_active' => true,
 
                         'child_menus' => [
+
+                            [
+                                'name' => 'User Access',
+                                'slug' => 'user-access',
+                                'route' => '/admin/user-access',
+                                'permission' => 'user_access.view',
+                                'icon' => null,
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
 
                             [
                                 'name' => 'Permission',

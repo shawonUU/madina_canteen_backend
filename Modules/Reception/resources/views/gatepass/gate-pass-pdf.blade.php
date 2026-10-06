@@ -1,16 +1,15 @@
+use Illuminate\Support\Facades\DB;
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
 
-    <title>
-        Gate Pass - {{ $gatePass->pass_no }}
-    </title>
+    <title>Gate Pass - {{ $gatePass->pass_no }}</title>
 
     <style>
         @page {
-            margin: 25px 30px;
+            size: A4 portrait;
+            margin: 18px 28px 20px 28px;
         }
 
         * {
@@ -18,90 +17,151 @@
         }
 
         body {
-            font-family: DejaVu Sans, sans-serif;
-            color: #222;
-            font-size: 12px;
             margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #000;
+            font-size: 8px;
+        }
+
+        .page {
+            width: 100%;
+        }
+
+        /* =========================
+           HEADER
+        ========================= */
+
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 5px;
+        }
+
+        .header-table td {
+            vertical-align: middle;
             padding: 0;
         }
 
-        .header {
+        .logo-left {
+            width: 18%;
             text-align: center;
-            border-bottom: 2px solid #1e3a8a;
-            padding-bottom: 12px;
-            margin-bottom: 18px;
+        }
+
+        .logo-middle {
+            width: 28%;
+            text-align: center;
+        }
+
+        .company-info {
+            width: 54%;
+            text-align: left;
+            padding-left: 5px !important;
+        }
+
+        .logo-left img {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+        }
+
+        .logo-middle img {
+            width: 72px;
+            height: auto;
+            object-fit: contain;
         }
 
         .company-name {
-            font-size: 20px;
+            font-size: 11px;
             font-weight: bold;
-            color: #1e3a8a;
-            margin-bottom: 4px;
+            line-height: 11px;
+        }
+
+        .company-title {
+            font-size: 10px;
+            font-weight: bold;
+            line-height: 10px;
+        }
+
+        .company-address {
+            font-size: 7px;
+            line-height: 9px;
+        }
+
+        .company-contact {
+            font-size: 7px;
+            line-height: 9px;
         }
 
         .document-title {
-            font-size: 17px;
+            text-align: center;
+            font-size: 14px;
             font-weight: bold;
-            margin-top: 6px;
+            margin-top: 2px;
+            margin-bottom: 7px;
         }
 
-        .document-subtitle {
-            font-size: 10px;
-            color: #666;
-            margin-top: 3px;
-        }
+        /* =========================
+           BASIC INFO
+        ========================= */
 
         .info-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 18px;
+            table-layout: fixed;
         }
 
         .info-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            vertical-align: top;
+            border: 1px solid #000;
+            height: 17px;
+            padding: 2px 4px;
+            font-size: 7.5px;
+            vertical-align: middle;
         }
 
         .label {
-            width: 18%;
-            background: #f3f4f6;
             font-weight: bold;
-            color: #374151;
+            width: 18%;
         }
 
         .value {
             width: 32%;
         }
 
+        /* =========================
+           MATERIAL TABLE
+        ========================= */
+
         .section-title {
-            color: #000;
-            font-size: 12px;
+            font-size: 8px;
             font-weight: bold;
-            padding: 8px 10px;
-            margin-top: 15px;
-            margin-bottom: 0;
+            margin-top: 7px;
+            margin-bottom: 2px;
         }
 
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 18px;
+            table-layout: fixed;
+        }
+
+        .items-table th,
+        .items-table td {
+            border: 1px solid #000;
+            padding: 2px 3px;
+            font-size: 7px;
+            vertical-align: middle;
+            word-wrap: break-word;
         }
 
         .items-table th {
-            background: #f3f4f6;
-            border: 1px solid #d1d5db;
-            padding: 7px;
-            font-size: 10px;
-            text-align: left;
+            font-weight: bold;
+            text-align: center;
+            height: 25px;
         }
 
         .items-table td {
-            border: 1px solid #d1d5db;
-            padding: 7px;
-            font-size: 10px;
-            vertical-align: top;
+            height: 20px;
         }
 
         .text-center {
@@ -112,228 +172,243 @@
             text-align: right;
         }
 
-        .remarks-box {
-            border: 1px solid #ddd;
-            min-height: 55px;
-            padding: 9px;
-            margin-bottom: 20px;
+        /* =========================
+           REMARKS
+        ========================= */
+
+        .remarks-label {
+            border: 1px solid #000;
+            border-top: 0;
+            font-size: 7.5px;
+            font-weight: bold;
+            padding: 3px 4px;
+            margin-top: 0;
         }
 
-        .status {
-            display: inline-block;
-            padding: 4px 9px;
-            border: 1px solid #ddd;
+        .remarks-box {
+            border: 1px solid #000;
+            min-height: 95px;
+            padding: 4px;
+            font-size: 7.5px;
+        }
+
+        /* =========================
+           PURPOSE
+        ========================= */
+
+        .purpose-box {
+            border: 1px solid #000;
+            min-height: 32px;
+            padding: 4px;
+            font-size: 7.5px;
+        }
+
+        /* =========================
+           SIGNATURE AREA
+        ========================= */
+
+        .signature-note {
+            font-size: 7.5px;
             font-weight: bold;
-            text-transform: capitalize;
+            margin-top: 8px;
+            margin-bottom: 0;
         }
 
         .signature-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 55px;
+            table-layout: fixed;
         }
 
         .signature-table td {
             width: 50%;
+            border: 1px solid #000;
+            height: 92px;
+            padding: 3px;
             text-align: center;
-            vertical-align: bottom;
-            padding: 0 30px;
+            vertical-align: top;
         }
 
-        .signature-line {
-            border-top: 1px solid #333;
-            padding-top: 7px;
-            margin-top: 35px;
+        .signature-title {
+            font-size: 7.5px;
+            font-weight: bold;
+            margin-bottom: 2px;
         }
 
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            font-size: 9px;
-            color: #888;
-            border-top: 1px solid #eee;
-            padding-top: 5px;
+        .signature-image {
+            width: 62px;
+            height: 35px;
+            object-fit: contain;
+            margin: 1px auto 0 auto;
         }
 
-        .small {
-            font-size: 10px;
-            color: #666;
+        .signature-name {
+            font-size: 6.5px;
+            line-height: 8px;
+            margin-top: 0;
+        }
+
+        .signature-designation {
+            font-size: 6.5px;
+            line-height: 8px;
+        }
+
+        .signature-date {
+            font-size: 6px;
+            line-height: 7px;
+            margin-top: 2px;
+        }
+
+        /* =========================
+           STATUS
+        ========================= */
+
+        .status {
+            font-weight: bold;
+        }
+
+        /* =========================
+           PRINT
+        ========================= */
+
+        .no-border {
+            border: 0 !important;
         }
     </style>
 </head>
 
 <body>
+<div class="page">
 
-    <div class="header">
-        <div class="company-name">
-            MADINA GROUP
-        </div>
+    <table class="header-table" style="margin-top:15px;">
+        <tr>
+            <td class="logo-left">
+                <img
+                    src="{{ public_path('images/madina_logo.png') }}"
+                    alt="Madina Group"
+                >
+            </td>
 
-        <div class="document-title">
-            GATE PASS
-        </div>
+            <td class="logo-middle">
+                <img
+                    src="{{ public_path('images/madina_maritime_logo.png') }}"
+                    alt="Madina Maritime"
+                >
+            </td>
 
-        <div class="document-subtitle">
-            Gate Management System
-        </div>
+            <td class="company-info">
+                <div class="company-name">Madina Group</div>
+                <div class="company-title">Madina Maritime Limited</div>
+
+                <div class="company-address">
+                    Head Office: Madina Square (3rd Floor), 66/A Shahid Badrul Miah Chowdhury
+                </div>
+
+                <div class="company-address">
+                    Sharif (Central Road) Dhanmondi, Dhaka-1205, Bangladesh
+                </div>
+
+                <div class="company-contact">
+                    www.madina.co, Phone: +0222336358, +022336358
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="document-title" style="margin-top: 50px; margin-bottom: 5px;">
+        GATE PASS
     </div>
 
-
+    {{-- =========================================================
+         GATE PASS INFORMATION
+    ========================================================== --}}
     <table class="info-table">
 
         <tr>
-            <td class="label">
-                Pass No
-            </td>
-
+            <td class="label">Pass No</td>
             <td class="value">
-                <strong>
-                    {{ $gatePass->pass_no }}
-                </strong>
+                {{ $gatePass->pass_no }}
             </td>
 
-            <td class="label">
-                Gate Pass Type
-            </td>
-
+            <td class="label">Department</td>
             <td class="value">
-                @if ($gatePass->gate_pass_type === 'person')
-                    Person
-                @elseif ($gatePass->gate_pass_type === 'material')
-                    Material
-                @elseif ($gatePass->gate_pass_type === 'person_material')
-                    Person + Material
-                @else
-                    {{ $gatePass->gate_pass_type }}
-                @endif
+                {{ $gatePass->department_name ?? '--' }}
             </td>
         </tr>
 
         <tr>
-            <td class="label">
-                Requested By
-            </td>
-
+            <td class="label">Requested By</td>
             <td class="value">
                 {{ $gatePass->requester?->name ?? '--' }}
             </td>
 
-            <td class="label">
-                Status
-            </td>
-
+            <td class="label">Gate Pass Type</td>
             <td class="value">
-                <span class="status">
-                    {{ ucfirst($gatePass->status) }}
-                </span>
+                {{ ucfirst(str_replace('_', ' ', $gatePass->gate_pass_type)) }}
             </td>
         </tr>
 
         <tr>
-            <td class="label">
-                Department
-            </td>
-
+            <td class="label">Designation</td>
             <td class="value">
-                {{ $gatePass->department_name }}
+                {{ $gatePass->designation_name ?? '--' }}
             </td>
 
-            <td class="label">
-                Designation
-            </td>
-
-            <td class="value">
-                {{ $gatePass->designation_name }}
+            <td class="label">Status</td>
+            <td class="value status">
+                {{ ucfirst($gatePass->status ?? '--') }}
             </td>
         </tr>
 
         <tr>
-            <td class="label">
-                Expected Exit
-            </td>
-
+            <td class="label">Expected Exit</td>
             <td class="value">
                 {{ $gatePass->expected_exit_at ?? '--' }}
             </td>
 
-            <td class="label">
-                Expected Return
-            </td>
-
+            <td class="label">Expected Return</td>
             <td class="value">
                 {{ $gatePass->expected_return_at ?? '--' }}
             </td>
         </tr>
 
         <tr>
-            <td class="label">
-                Purpose
-            </td>
-
+            <td class="label">Purpose</td>
             <td colspan="3">
-                {{ $gatePass->purpose }}
+                {{ $gatePass->purpose ?? '--' }}
             </td>
         </tr>
 
     </table>
 
-
-    @if (
-        in_array(
-            $gatePass->gate_pass_type,
-            ['material', 'person_material']
-        )
-    )
+    {{-- =========================================================
+         MATERIAL DETAILS
+    ========================================================== --}}
+    @if(in_array($gatePass->gate_pass_type, ['Person With Material']))
 
         <div class="section-title">
             Material Details
         </div>
 
-        @if ($gatePass->items->count())
+        @if($gatePass->items && $gatePass->items->count())
 
             <table class="items-table">
 
                 <thead>
                     <tr>
-                        <th style="width: 5%;">
-                            SL
-                        </th>
-
-                        <th style="width: 25%;">
-                            Product / Material
-                        </th>
-
-                        <th style="width: 10%;">
-                            Quantity
-                        </th>
-
-                        <th style="width: 10%;">
-                            Unit
-                        </th>
-
-                        <th style="width: 15%;">
-                            Asset No
-                        </th>
-
-                        <th style="width: 15%;">
-                            Serial No
-                        </th>
-
-                        <th style="width: 20%;">
-                            Remarks
-                        </th>
+                        <th style="width: 5%;">SL</th>
+                        <th style="width: 25%;">Product / Material</th>
+                        <th style="width: 9%;">Qty</th>
+                        <th style="width: 9%;">Unit</th>
+                        <th style="width: 15%;">Asset No</th>
+                        <th style="width: 15%;">Serial No</th>
+                        <th style="width: 22%;">Remarks</th>
                     </tr>
                 </thead>
 
                 <tbody>
-
-                    @foreach ($gatePass->items as $index => $item)
-
+                    @foreach($gatePass->items as $index => $item)
                         <tr>
-
                             <td class="text-center">
                                 {{ $index + 1 }}
                             </td>
@@ -342,11 +417,11 @@
                                 {{ $item->product_name }}
                             </td>
 
-                            <td class="text-right">
+                            <td class="text-center">
                                 {{ $item->quantity }}
                             </td>
 
-                            <td>
+                            <td class="text-center">
                                 {{ $item->unit ?? '--' }}
                             </td>
 
@@ -361,18 +436,15 @@
                             <td>
                                 {{ $item->remarks ?? '--' }}
                             </td>
-
                         </tr>
-
                     @endforeach
-
                 </tbody>
 
             </table>
 
         @else
 
-            <div class="remarks-box">
+            <div class="remarks-box" style="min-height: 35px;">
                 No material items.
             </div>
 
@@ -380,50 +452,87 @@
 
     @endif
 
-
-    <div class="section-title">
-        Remarks
+    {{-- =========================================================
+         REMARKS
+    ========================================================== --}}
+    <div class="remarks-label">
+        Remarks: {{ $gatePass->remarks ?? '' }}
     </div>
 
-    <div class="remarks-box">
-        {{ $gatePass->remarks ?? 'No remarks.' }}
+    {{-- =========================================================
+         SIGNATURE SECTION
+    ========================================================== --}}
+    <div class="signature-note">
+        - For Gate Pass Department
     </div>
 
+<table class="signature-table">
 
-    <table class="signature-table">
+    <tr>
 
-        <tr>
+        {{-- Requested By --}}
+        <td>
+            <div class="signature-title">
+                Requested By
+            </div>
 
+            <img
+                class="signature-image"
+                src="{{ public_path('images/signatures/requested_by.png') }}"
+                alt="Signature"
+            >
+
+            <div class="signature-name">
+                {{ $gatePass->requester?->name ?? '--' }}
+            </div>
+
+            <div class="signature-designation">
+                {{ $gatePass->designation_name ?? '--' }}
+            </div>
+
+            <div class="signature-date">
+                Date:
+                {{ optional($gatePass->created_at)->format('d-m-Y h:i A') ?? '--' }}
+            </div>
+        </td>
+
+
+        {{-- Approved By --}}
+        @php
+            $approvedLevel = $gatePass?->approvalRequest?->levels;
+        @endphp
+
+        @foreach ( $approvedLevel as $level )
             <td>
-                <div class="signature-line">
-                    Requested By
+                <div class="signature-title">
+                    Approved By
                 </div>
 
-                <div class="small">
-                    {{ $gatePass->requester?->name ?? '--' }}
+                <img
+                    class="signature-image"
+                    src="{{ public_path('images/signatures/authorized_by.png') }}"
+                    alt="Signature"
+                >
+
+                <div class="signature-name">
+                    {{ $level?->approver?->name ?? '--' }}
+                </div>
+
+                <div class="signature-designation">
+                    {{ $level ? 'Level ' . $level->level_no : '--' }}
+                </div>
+
+                <div class="signature-date">
+                    Date:
+                    {{ optional($level?->action_at)->format('d-m-Y h:i A') ?? '--' }}
                 </div>
             </td>
+        @endforeach
 
-            <td>
-                <div class="signature-line">
-                    Authorized By
-                </div>
+    </tr>
 
-                <div class="small">
-                    Signature &amp; Seal
-                </div>
-            </td>
+</table>
 
-        </tr>
-
-    </table>
-
-
-    <div class="footer">
-        Generated from Madina Group
-        | Pass No: {{ $gatePass->pass_no }}
-    </div>
-
+</div>
 </body>
-
 </html>

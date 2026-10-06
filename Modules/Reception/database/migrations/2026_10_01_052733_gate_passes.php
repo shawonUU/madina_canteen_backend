@@ -13,7 +13,6 @@ return new class extends Migration
         Schema::create('gate_passes', function (Blueprint $table) {
             $table->id();
             $table->string('code')->unique();
-            $table->string('pass_no')->unique();
             $table->enum('gate_pass_type', ['Person','Person With Material',]);
             $table->foreignId('requested_by')->constrained('users');
             $table->foreignId('department_id')->nullable();

@@ -4,12 +4,12 @@ namespace Modules\Approval\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Admin\Models\User;
 use Modules\Approval\Models\ApprovalAction;
 use Modules\Approval\Models\ApprovalDelegation;
 use Modules\Approval\Models\ApprovalRequest;
 use Modules\Approval\Models\ApprovalRequestLevel;
 use Modules\Approval\Models\ApprovalWorkflow;
-use Modules\Approval\Models\User;
 
 class ApprovalService
 {
@@ -34,7 +34,7 @@ class ApprovalService
                 }
 
                 $approvalRequest = ApprovalRequest::create([
-                    'code' => getGenerateCode(ApprovalRequestLevel::class, 'code', 'AR', 8),
+                    'code' => getGenerateCode(ApprovalRequest::class, 'code', 'AR'),
                     'workflow_id' => $workflow->id,
                     'document_type' => $documentType,
                     'document_id' => $documentId,
@@ -47,7 +47,7 @@ class ApprovalService
 
                 foreach ($workflow->levels as $workflowLevel) {
                     ApprovalRequestLevel::create([
-                        'code' => getGenerateCode(ApprovalRequestLevel::class, 'code', 'ARL', 8),
+                        'code' => getGenerateCode(ApprovalRequestLevel::class, 'code', 'ARL'),
                         'approval_request_id' => $approvalRequest->id,
                         'level_no' => $workflowLevel->level_no,
                         'level_name' => $workflowLevel->name,
@@ -63,7 +63,7 @@ class ApprovalService
                 }
 
                 ApprovalAction::create([
-                    'code' => getGenerateCode(ApprovalAction::class, 'code', 'AA', 8),
+                    'code' => getGenerateCode(ApprovalAction::class, 'code', 'AA'),
                     'approval_request_id' => $approvalRequest->id,
                     'approval_request_level_id' => null,
                     'action' => 'Submitted',
@@ -104,7 +104,7 @@ class ApprovalService
             ]);
 
             ApprovalAction::create([
-                'code' => getGenerateCode(ApprovalAction::class, 'code', 'AA', 8),
+                'code' => getGenerateCode(ApprovalAction::class, 'code', 'AA'),
                 'approval_request_id' => $approvalRequest->id,
                 'approval_request_level_id' => $level->id,
                 'action' => 'Approved',
@@ -169,7 +169,7 @@ class ApprovalService
             ]);
 
             ApprovalAction::create([
-                'code' => getGenerateCode(ApprovalAction::class, 'code', 'AA', 8),
+                'code' => getGenerateCode(ApprovalAction::class, 'code', 'AA'),
                 'approval_request_id' => $approvalRequest->id,
                 'approval_request_level_id' => $level->id,
                 'action' => 'Rejected',
@@ -209,7 +209,7 @@ class ApprovalService
             ]);
 
             ApprovalAction::create([
-                'code' => getGenerateCode(ApprovalAction::class, 'code', 'AA', 8),
+                'code' => getGenerateCode(ApprovalAction::class, 'code', 'AA'),
                 'approval_request_id' => $approvalRequest->id,
                 'approval_request_level_id' => $level->id,
                 'action' => 'Returned',

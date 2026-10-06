@@ -7,6 +7,7 @@ use Modules\Admin\Http\Controllers\MenuController;
 use Modules\Admin\Http\Controllers\ModuleController;
 use Modules\Admin\Http\Controllers\PermissionController;
 use Modules\Admin\Http\Controllers\RoleController;
+use Modules\Admin\Http\Controllers\UserAccessController;
 use Modules\Admin\Http\Controllers\UserController;
 use Modules\Admin\Http\Controllers\UserPermissionController;
 
@@ -21,8 +22,6 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->prefix('auth')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
-
-
 });
 
 Route::prefix('admin')->group(function () {
@@ -32,6 +31,8 @@ Route::prefix('admin')->group(function () {
     Route::apiResource('users', UserController::class)->names('user');
     Route::apiResource('roles', RoleController::class);
     Route::apiResource('permissions', PermissionController::class);
+    Route::get( '/users/{user}/access', [UserAccessController::class, 'show']);
+    Route::put('/users/{user}/access',  [UserAccessController::class, 'update'] );
 });
 
 
