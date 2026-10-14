@@ -94,18 +94,6 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
-
-                        'child_menus' => [
-                            [
-                                'name' => 'Meal Type List',
-                                'slug' => 'meal-type-list',
-                                'route' => '/canteen/meal-types',
-                                'permission' => 'meal_type.view',
-                                'icon' => 'CircleDot',
-                                'sort_order' => 1,
-                                'is_active' => true,
-                            ],
-                        ],
                     ],
 
                     [
@@ -116,18 +104,6 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 2,
                         'is_active' => true,
-
-                        'child_menus' => [
-                            [
-                                'name' => 'Meal Menu List',
-                                'slug' => 'meal-menu-list',
-                                'route' => '/canteen/meal-menus',
-                                'permission' => 'meal_menu.view',
-                                'icon' => 'CircleDot',
-                                'sort_order' => 1,
-                                'is_active' => true,
-                            ],
-                        ],
                     ],
 
                     [
@@ -138,18 +114,6 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 3,
                         'is_active' => true,
-
-                        'child_menus' => [
-                            [
-                                'name' => 'Meal Booking List',
-                                'slug' => 'meal-booking-list',
-                                'route' => '/canteen/meal-bookings',
-                                'permission' => 'meal_booking.view',
-                                'icon' => 'CircleDot',
-                                'sort_order' => 1,
-                                'is_active' => true,
-                            ],
-                        ],
                     ],
 
                     [
@@ -160,18 +124,6 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 4,
                         'is_active' => true,
-
-                        'child_menus' => [
-                            [
-                                'name' => 'Serve Meal',
-                                'slug' => 'serve-meal-list',
-                                'route' => '/canteen/serve-meal',
-                                'permission' => 'serve_meal.view',
-                                'icon' => 'CircleDot',
-                                'sort_order' => 1,
-                                'is_active' => true,
-                            ],
-                        ],
                     ],
 
                 ],

@@ -52,7 +52,7 @@ class DatabaseSeeder extends Seeder
 
         $admin = User::updateOrCreate(
             [
-                'email' => 'sawonmiah@madina.co',
+                'email' => 'admin@gmail.com',
             ],
             [
                 'code' => getGenerateCode(
@@ -61,7 +61,7 @@ class DatabaseSeeder extends Seeder
                     'USR',
                     8
                 ),
-                'name' => 'Md. Sawon Miah',
+                'name' => 'Admin User',
                 'password' => Hash::make('12345678'),
             ]
         );
