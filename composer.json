@@ -50,7 +50,11 @@
 
             "Modules\\Approval\\": "Modules/Approval/app/",
             "Modules\\Approval\\Database\\Factories\\": "Modules/Approval/database/factories/",
-            "Modules\\Approval\\Database\\Seeders\\": "Modules/Approval/database/seeders/"
+            "Modules\\Approval\\Database\\Seeders\\": "Modules/Approval/database/seeders/",
+
+            "Modules\\Meeting\\": "Modules/Meeting/app/",
+            "Modules\\Meeting\\Database\\Factories\\": "Modules/Meeting/database/factories/",
+            "Modules\\Meeting\\Database\\Seeders\\": "Modules/Meeting/database/seeders/"
         }
     },
     "autoload-dev": {

@@ -209,6 +209,135 @@ class MenuSeeder extends Seeder
 
             /*
             |--------------------------------------------------------------------------
+            | Meeting Management
+            |--------------------------------------------------------------------------
+            */
+            [
+                'name' => 'Meeting Management',
+                'slug' => 'meeting',
+                'icon' => 'Users',
+                'sort_order' => 5,
+                'is_active' => true,
+
+                'menus' => [
+
+                    [
+                        'name' => 'Meeting Scheduling',
+                        'slug' => 'meeting-scheduling',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'CalendarDays',
+                        'sort_order' => 1,
+                        'is_active' => true,
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Meeting List',
+                                'slug' => 'meeting-list',
+                                'route' => '/meeting/meetings',
+                                'permission' => 'meeting.view',
+                                'icon' => 'List',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                            [
+                                'name' => 'Create Meeting',
+                                'slug' => 'create-meeting',
+                                'route' => '/meeting/meetings/create',
+                                'permission' => 'meeting.create',
+                                'icon' => 'CalendarPlus',
+                                'sort_order' => 2,
+                                'is_active' => true,
+                            ],
+                            [
+                                'name' => 'Calendar View',
+                                'slug' => 'meeting-calendar',
+                                'route' => '/meeting/calendar',
+                                'permission' => 'meeting.view',
+                                'icon' => 'Calendar',
+                                'sort_order' => 3,
+                                'is_active' => true,
+                            ],
+                        ],
+                    ],
+
+                    [
+                        'name' => 'Invitations',
+                        'slug' => 'invitations',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'UserRoundCheck',
+                        'sort_order' => 2,
+                        'is_active' => true,
+                    ],
+
+                    [
+                        'name' => 'Meeting Agenda',
+                        'slug' => 'meeting-agenda',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'ListChecks',
+                        'sort_order' => 3,
+                        'is_active' => true,
+                    ],
+
+                    [
+                        'name' => 'Meeting Attendance',
+                        'slug' => 'meeting-attendance',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'ClipboardCheck',
+                        'sort_order' => 4,
+                        'is_active' => true,
+                    ],
+
+                    [
+                        'name' => 'Meeting Minutes',
+                        'slug' => 'meeting-minutes',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'FileText',
+                        'sort_order' => 5,
+                        'is_active' => true,
+                    ],
+
+                    [
+                        'name' => 'Meeting Reports',
+                        'slug' => 'meeting-reports',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'ChartNoAxesCombined',
+                        'sort_order' => 6,
+                        'is_active' => true,
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Meeting Summary',
+                                'slug' => 'meeting-summary',
+                                'route' => '/meeting/reports/summary',
+                                'permission' => 'meeting.report.view',
+                                'icon' => 'ChartBar',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                            [
+                                'name' => 'Attendance Report',
+                                'slug' => 'attendance-report',
+                                'route' => '/meeting/attendance/report',
+                                'permission' => 'meeting.attendance.report',
+                                'icon' => 'ChartNoAxesCombined',
+                                'sort_order' => 2,
+                                'is_active' => true,
+                            ],
+                        ],
+                    ],
+
+                ],
+            ],
+
+
+            /*
+            |--------------------------------------------------------------------------
             | Admin
             |--------------------------------------------------------------------------
             */
@@ -216,7 +345,7 @@ class MenuSeeder extends Seeder
                 'name' => 'Admin',
                 'slug' => 'admin',
                 'icon' => 'Settings',
-                'sort_order' => 5,
+                'sort_order' => 6,
                 'is_active' => true,
 
                 'menus' => [

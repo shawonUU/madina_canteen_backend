@@ -5,13 +5,12 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-
 use Modules\Admin\Database\Seeders\MenuSeeder;
+use Modules\Admin\Models\Module;
 use Modules\Admin\Models\User;
 use Modules\Admin\Models\UserAccess;
-use Modules\Admin\Models\Module;
-
 use Modules\Canteen\Database\Seeders\MealDatabaseSeeder;
+use Modules\HRM\Models\Employee;
 
 class DatabaseSeeder extends Seeder
 {
@@ -50,59 +49,75 @@ class DatabaseSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
+        $adminEmployee = Employee::updateOrCreate(
+            [
+                'email' => 'admin@gmail.com',
+            ],
+            [
+                'code' => getGenerateCode(Employee::class, 'code', 'EMP', 8),
+                'name' => 'Admin User',
+                'department' => 'IT',
+                'designation' => 'System Administrator',
+            ]
+        );
+
         $admin = User::updateOrCreate(
             [
                 'email' => 'admin@gmail.com',
             ],
             [
-                'code' => getGenerateCode(
-                    User::class,
-                    'code',
-                    'USR',
-                    8
-                ),
+                'code' => getGenerateCode(User::class, 'code', 'USR', 8),
                 'name' => 'Admin User',
                 'password' => Hash::make('12345678'),
+                'employee_id' => $adminEmployee->id,
             ]
         );
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Other Users
-        |--------------------------------------------------------------------------
-        */
+        $mojmeenEmployee = Employee::updateOrCreate(
+            [
+                'email' => 'mojmeen@gmail.com',
+            ],
+            [
+                'code' => getGenerateCode(Employee::class, 'code', 'EMP', 8),
+                'name' => 'Mojmeen Akther',
+                'department' => 'Accounts & Finance',
+                'designation' => 'AGM',
+            ]
+        );
 
         User::updateOrCreate(
             [
                 'email' => 'mojmeen@gmail.com',
             ],
             [
-                'code' => getGenerateCode(
-                    User::class,
-                    'code',
-                    'USR',
-                    8
-                ),
+                'code' => getGenerateCode(User::class, 'code', 'USR', 8),
                 'name' => 'Mojmeen Akther',
                 'password' => Hash::make('12345678'),
+                'employee_id' => $mojmeenEmployee->id,
             ]
         );
 
+        $hrEmployee = Employee::updateOrCreate(
+            [
+                'email' => 'hr@gmail.com',
+            ],
+            [
+                'code' => getGenerateCode(Employee::class, 'code', 'EMP', 8),
+                'name' => 'Jannatul Ferdous',
+                'department' => 'HR',
+                'designation' => 'Senior Executive HR',
+            ]
+        );
 
         User::updateOrCreate(
             [
                 'email' => 'hr@gmail.com',
             ],
             [
-                'code' => getGenerateCode(
-                    User::class,
-                    'code',
-                    'USR',
-                    8
-                ),
+                'code' => getGenerateCode(User::class, 'code', 'USR', 8),
                 'name' => 'Jannatul Ferdous',
                 'password' => Hash::make('12345678'),
+                'employee_id' => $hrEmployee->id,
             ]
         );
 

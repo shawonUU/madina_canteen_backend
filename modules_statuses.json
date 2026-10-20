@@ -3,5 +3,6 @@
     "HRM": true,
     "Canteen": true,
     "Reception": true,
-    "Approval": true
+    "Approval": true,
+    "Meeting": true
 }
