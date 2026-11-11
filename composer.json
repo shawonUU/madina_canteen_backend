@@ -54,7 +54,11 @@
 
             "Modules\\Meeting\\": "Modules/Meeting/app/",
             "Modules\\Meeting\\Database\\Factories\\": "Modules/Meeting/database/factories/",
-            "Modules\\Meeting\\Database\\Seeders\\": "Modules/Meeting/database/seeders/"
+            "Modules\\Meeting\\Database\\Seeders\\": "Modules/Meeting/database/seeders/",
+
+            "Modules\\Support\\": "Modules/Support/app/",
+            "Modules\\Support\\Database\\Factories\\": "Modules/Support/database/factories/",
+            "Modules\\Support\\Database\\Seeders\\": "Modules/Support/database/seeders/"
         }
     },
     "autoload-dev": {

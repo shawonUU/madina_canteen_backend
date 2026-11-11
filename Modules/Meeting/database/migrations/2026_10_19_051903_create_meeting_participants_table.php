@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('guest_company')->nullable();
 
             $table->string('participation_type', 20)->default('required');
-            $table->string('invitation_status', 20)->default('pending');
+            $table->enum('invitation_status', [ 'Pending', 'Accepted', 'Declined' ])->default('Pending');
             $table->timestamp('responded_at')->nullable();
             $table->text('response_note')->nullable();
 

@@ -502,32 +502,34 @@ use Illuminate\Support\Facades\DB;
             $approvedLevel = $gatePass?->approvalRequest?->levels;
         @endphp
 
-        @foreach ( $approvedLevel as $level )
-            <td>
-                <div class="signature-title">
-                    Approved By
-                </div>
+        @if($approvedLevel)
+            @foreach ( $approvedLevel as $level )
+                <td>
+                    <div class="signature-title">
+                        Approved By
+                    </div>
 
-                <img
-                    class="signature-image"
-                    src="{{ public_path('images/signatures/authorized_by.png') }}"
-                    alt="Signature"
-                >
+                    <img
+                        class="signature-image"
+                        src="{{ public_path('images/signatures/authorized_by.png') }}"
+                        alt="Signature"
+                    >
 
-                <div class="signature-name">
-                    {{ $level?->approver?->name ?? '--' }}
-                </div>
+                    <div class="signature-name">
+                        {{ $level?->approver?->name ?? '--' }}
+                    </div>
 
-                <div class="signature-designation">
-                    {{ $level ? 'Level ' . $level->level_no : '--' }}
-                </div>
+                    <div class="signature-designation">
+                        {{ $level ? 'Level ' . $level->level_no : '--' }}
+                    </div>
 
-                <div class="signature-date">
-                    Date:
-                    {{ optional($level?->action_at)->format('d-m-Y h:i A') ?? '--' }}
-                </div>
-            </td>
-        @endforeach
+                    <div class="signature-date">
+                        Date:
+                        {{ optional($level?->action_at)->format('d-m-Y h:i A') ?? '--' }}
+                    </div>
+                </td>
+            @endforeach
+        @endif
 
     </tr>
 

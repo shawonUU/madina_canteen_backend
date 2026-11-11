@@ -34,18 +34,6 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
-
-                        'child_menus' => [
-                            [
-                                'name' => 'Workflow List',
-                                'slug' => 'workflow-list',
-                                'route' => '/approval/workflows',
-                                'permission' => 'approval_workflow.view',
-                                'icon' => 'CircleDot',
-                                'sort_order' => 1,
-                                'is_active' => true,
-                            ],
-                        ],
                     ],
 
                     [
@@ -56,18 +44,6 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 2,
                         'is_active' => true,
-
-                        'child_menus' => [
-                            [
-                                'name' => 'Pending Approval List',
-                                'slug' => 'pending-approval-list',
-                                'route' => '/approval/pending',
-                                'permission' => 'pending_approval.view',
-                                'icon' => 'CircleDot',
-                                'sort_order' => 1,
-                                'is_active' => true,
-                            ],
-                        ],
                     ],
                 ],
             ],
@@ -183,12 +159,43 @@ class MenuSeeder extends Seeder
                 'menus' => [
 
                     [
+                        'name' => 'Configurations',
+                        'slug' => 'configuration',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'Circle',
+                        'sort_order' => 1,
+                        'is_active' => true,
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Department List',
+                                'slug' => 'department-list',
+                                'route' => '',
+                                'permission' => 'department.view',
+                                'icon' => 'CircleDot',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                            [
+                                'name' => 'Designation List',
+                                'slug' => 'designation-list',
+                                'route' => '',
+                                'permission' => 'designation.view',
+                                'icon' => 'CircleDot',
+                                'sort_order' => 2,
+                                'is_active' => true,
+                            ],
+                        ],
+                    ],
+
+                    [
                         'name' => 'Employee Management',
                         'slug' => 'employee-management',
                         'route' => null,
                         'permission' => null,
                         'icon' => 'Circle',
-                        'sort_order' => 1,
+                        'sort_order' => 2,
                         'is_active' => true,
 
                         'child_menus' => [
@@ -271,25 +278,25 @@ class MenuSeeder extends Seeder
                         'is_active' => true,
                     ],
 
-                    [
-                        'name' => 'Meeting Agenda',
-                        'slug' => 'meeting-agenda',
-                        'route' => null,
-                        'permission' => null,
-                        'icon' => 'ListChecks',
-                        'sort_order' => 3,
-                        'is_active' => true,
-                    ],
+                    // [
+                    //     'name' => 'Meeting Agenda',
+                    //     'slug' => 'meeting-agenda',
+                    //     'route' => null,
+                    //     'permission' => null,
+                    //     'icon' => 'ListChecks',
+                    //     'sort_order' => 3,
+                    //     'is_active' => true,
+                    // ],
 
-                    [
-                        'name' => 'Meeting Attendance',
-                        'slug' => 'meeting-attendance',
-                        'route' => null,
-                        'permission' => null,
-                        'icon' => 'ClipboardCheck',
-                        'sort_order' => 4,
-                        'is_active' => true,
-                    ],
+                    // [
+                    //     'name' => 'Meeting Attendance',
+                    //     'slug' => 'meeting-attendance',
+                    //     'route' => null,
+                    //     'permission' => null,
+                    //     'icon' => 'ClipboardCheck',
+                    //     'sort_order' => 4,
+                    //     'is_active' => true,
+                    // ],
 
                     [
                         'name' => 'Meeting Minutes',
@@ -338,6 +345,107 @@ class MenuSeeder extends Seeder
 
             /*
             |--------------------------------------------------------------------------
+            | Support & Helpdesk
+            |--------------------------------------------------------------------------
+            */
+
+
+            [
+                'name' => 'Support & Helpdesk',
+                'slug' => 'support',
+                'icon' => 'Headset',
+                'sort_order' => 6,
+                'is_active' => true,
+
+                'menus' => [
+
+                    [
+                        'name' => 'Support Dashboard',
+                        'slug' => 'support-dashboard',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'LayoutDashboard',
+                        'sort_order' => 1,
+                        'is_active' => true,
+                    ],
+
+                    [
+                        'name' => 'Create Ticket',
+                        'slug' => 'create-ticket',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'PlusCircle',
+                        'sort_order' => 2,
+                        'is_active' => true,
+                    ],
+
+                    [
+                        'name' => 'My Tickets',
+                        'slug' => 'my-tickets',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'Ticket',
+                        'sort_order' => 3,
+                        'is_active' => true,
+                    ],
+
+                    [
+                        'name' => 'All Tickets',
+                        'slug' => 'all-tickets',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'ListChecks',
+                        'sort_order' => 4,
+                        'is_active' => true,
+                    ],
+
+                    [
+                        'name' => 'My Assigned Tickets',
+                        'slug' => 'my-assigned-tickets',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'UserRoundCheck',
+                        'sort_order' => 5,
+                        'is_active' => true,
+                    ],
+
+                    [
+                        'name' => 'Reports',
+                        'slug' => 'support-reports',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'ChartNoAxesCombined',
+                        'sort_order' => 6,
+                        'is_active' => true,
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Ticket Summary',
+                                'slug' => 'ticket-summary',
+                                'route' => null,
+                                'permission' => null,
+                                'icon' => 'ChartBar',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                            ],
+                            [
+                                'name' => 'Resolution Report',
+                                'slug' => 'resolution-report',
+                                'route' => null,
+                                'permission' => null,
+                                'icon' => 'Clock',
+                                'sort_order' => 2,
+                                'is_active' => true,
+                            ],
+                        ],
+                    ],
+
+                ],
+            ],
+
+
+            /*
+            |--------------------------------------------------------------------------
             | Admin
             |--------------------------------------------------------------------------
             */
@@ -345,7 +453,7 @@ class MenuSeeder extends Seeder
                 'name' => 'Admin',
                 'slug' => 'admin',
                 'icon' => 'Settings',
-                'sort_order' => 6,
+                'sort_order' => 7,
                 'is_active' => true,
 
                 'menus' => [

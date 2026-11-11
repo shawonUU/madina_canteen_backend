@@ -4,5 +4,6 @@
     "Canteen": true,
     "Reception": true,
     "Approval": true,
-    "Meeting": true
+    "Meeting": true,
+    "Support": true
 }

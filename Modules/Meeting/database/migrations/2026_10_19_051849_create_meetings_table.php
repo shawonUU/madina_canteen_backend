@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('location')->nullable();
             $table->string('meeting_link')->nullable();
             $table->string('status', 30)->default('scheduled')->index();
+            $table->enum('approval_status', [ 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed', ])->default('Pending');
             $table->text('cancellation_reason')->nullable();
             $table->timestamp('started_at')->nullable();
             $table->timestamp('ended_at')->nullable();

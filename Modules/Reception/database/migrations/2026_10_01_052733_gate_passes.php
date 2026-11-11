@@ -24,6 +24,7 @@ return new class extends Migration
             $table->dateTime('expected_return_at')->nullable();
             $table->text('remarks')->nullable();
             $table->enum('status', [ 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed', ])->default('Pending');
+            $table->enum('approval_status', [ 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed', ])->default('Pending');
             $table->timestamps();
             $table->index(['gate_pass_type', 'status']);
             $table->index(['requested_by', 'status']);

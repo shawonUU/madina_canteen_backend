@@ -81,7 +81,7 @@ class MeetingParticipantController extends Controller
                 'guest_email' => null,
                 'guest_phone' => null,
                 'participation_type' => $validated['participation_type'],
-                'invitation_status' => 'pending',
+                'invitation_status' => 'Pending',
             ]);
         } else {
             $participant = $meeting->participants()->create([
@@ -91,7 +91,7 @@ class MeetingParticipantController extends Controller
                 'guest_email' => $validated['guest_email'] ?? null,
                 'guest_phone' => $validated['guest_phone'] ?? null,
                 'participation_type' => $validated['participation_type'],
-                'invitation_status' => 'pending',
+                'invitation_status' => 'Pending',
             ]);
         }
 
@@ -186,86 +186,167 @@ class MeetingParticipantController extends Controller
     }
 
     public function myInvitations(Request $request): JsonResponse
-    {
-        $user = $request->user();
+{
+    $user = $request->user();
 
-        $employeeId = $user->employee_id
-            ?? $user->employee?->id;
+    $employeeId = $user->employee_id
+        ?? $user->employee?->id;
 
-        if (!$employeeId) {
-            return response()->json([
-                'message' => 'No employee profile is associated with your account.',
-                'data' => [],
-            ], 403);
-        }
-
-        $invitations = MeetingParticipant::query()
-            ->with([
-                'meeting',
-            ])
-            ->where('employee_id', $employeeId)
-            ->latest('id')
-            ->get();
-
+    if (!$employeeId) {
         return response()->json([
-            'data' => $invitations,
-        ]);
+            'message' => 'No employee profile is associated with your account.',
+            'data' => [],
+        ], 403);
     }
 
-    public function updateInvitationStatus(
-        Request $request,
-        int $meetingId,
-        int $participantId
-    ): JsonResponse {
-        $validated = $request->validate([
-            'invitation_status' => [
-                'required',
-                'string',
-                'in:Accepted,Declined',
-            ],
-        ]);
+    $query = MeetingParticipant::query()
+        ->with('meeting')
+        ->where('employee_id', $employeeId);
 
-        $user = $request->user();
-
-        $employeeId = $user->employee_id
-            ?? $user->employee?->id;
-
-        if (!$employeeId) {
-            return response()->json([
-                'message' => 'No employee profile is associated with your account.',
-            ], 403);
-        }
-
-        $participant = MeetingParticipant::query()
-            ->where('id', $participantId)
-            ->where('meeting_id', $meetingId)
-            ->where('employee_id', $employeeId)
-            ->first();
-
-        if (!$participant) {
-            return response()->json([
-                'message' => 'Invitation not found or you are not authorized to update it.',
-            ], 404);
-        }
-
-        if (
-            strtolower($participant->invitation_status ?? '') !== 'pending'
-        ) {
-            return response()->json([
-                'message' => 'Only pending invitations can be updated.',
-            ], 422);
-        }
-
-        DB::transaction(function () use ($participant, $validated) {
-            $participant->invitation_status =
-                $validated['invitation_status'];
-
-            $participant->save();
+    // Global search
+    if ($search = trim((string) $request->query('search', ''))) {
+        $query->whereHas('meeting', function ($meetingQuery) use ($search) {
+            $meetingQuery->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('meeting_code', 'like', "%{$search}%");
+            });
         });
+    }
+
+    // Invitation status filter
+    if ($status = $request->input('filter.invitation_status')) {
+        $query->where('invitation_status', $status);
+    }
+
+    // Participation type filter
+    if ($type = $request->input('filter.participation_type')) {
+        $query->where('participation_type', $type);
+    }
+
+    // Meeting title filter
+    if ($meeting = $request->input('filter.meeting')) {
+        $query->whereHas('meeting', function ($q) use ($meeting) {
+            $q->where('title', 'like', "%{$meeting}%");
+        });
+    }
+
+    // Meeting date filter
+    if ($date = $request->input('filter.meeting_date')) {
+        $query->whereHas('meeting', function ($q) use ($date) {
+            $q->whereDate('meeting_date', $date);
+        });
+    }
+
+    // Status counts for the current employee
+    $statusCounts = MeetingParticipant::query()
+        ->where('employee_id', $employeeId)
+        ->selectRaw('invitation_status, COUNT(*) as total')
+        ->groupBy('invitation_status')
+        ->pluck('total', 'invitation_status');
+
+    // Safe sorting
+    $allowedSortColumns = [
+        'id',
+        'invitation_status',
+        'participation_type',
+        'created_at',
+    ];
+
+    $sort = (string) $request->query('sort', 'id');
+    $direction = strtolower((string) $request->query('direction', 'desc'));
+
+    if (!in_array($sort, $allowedSortColumns, true)) {
+        $sort = 'id';
+    }
+
+    if (!in_array($direction, ['asc', 'desc'], true)) {
+        $direction = 'desc';
+    }
+
+    $query->orderBy($sort, $direction);
+
+    // Server-side pagination
+    $perPage = min(
+        max((int) $request->query('per_page', 10), 1),
+        100
+    );
+
+    $invitations = $query->paginate($perPage)->withQueryString();
+
+    return response()->json([
+        'data' => $invitations->items(),
+        'meta' => [
+            'current_page' => $invitations->currentPage(),
+            'per_page' => $invitations->perPage(),
+            'total' => $invitations->total(),
+            'last_page' => $invitations->lastPage(),
+        ],
+        'counts' => [
+            'total' => (int) $statusCounts->sum(),
+            'Pending' => (int) ($statusCounts['Pending'] ?? 0),
+            'Accepted' => (int) ($statusCounts['Accepted'] ?? 0),
+            'Declined' => (int) ($statusCounts['Declined'] ?? 0),
+        ],
+    ]);
+}
+
+
+public function updateInvitationStatus( Request $request, int $meetingId, int $participantId ): JsonResponse {
+    $validated = $request->validate([
+        'invitation_status' => [
+            'required',
+            'string',
+            'in:Accepted,Declined',
+        ],
+    ]);
+
+    $user = $request->user();
+
+    $employeeId = $user->employee_id
+        ?? $user->employee?->id;
+
+    if (!$employeeId) {
+        return response()->json([
+            'message' => 'No employee profile is associated with your account.',
+        ], 403);
+    }
+
+    $participant = MeetingParticipant::query()
+        ->where('id', $participantId)
+        ->where('meeting_id', $meetingId)
+        ->where('employee_id', $employeeId)
+        ->first();
+
+    if (!$participant) {
+        return response()->json([
+            'message' => 'Invitation not found or you are not authorized to update it.',
+        ], 404);
+    }
+
+    if ($participant->invitation_status !== 'Pending') {
+        return response()->json([
+            'message' => 'Only pending invitations can be updated.',
+            'current_status' => $participant->invitation_status,
+        ], 422);
+    }
+
+    try {
+        $participant->invitation_status = $validated['invitation_status'];
+        $participant->saveOrFail();
+
+        $participant->refresh();
 
         return response()->json([
             'message' => 'Invitation status updated successfully.',
-            'data' => $participant->fresh()->load('meeting'),
+            'data' => $participant->load('meeting'),
         ]);
+    } catch (\Throwable $e) {
+        report($e);
+
+        return response()->json([
+            'message' => 'Failed to update invitation status.',
+        ], 500);
     }
+}
+
 }
