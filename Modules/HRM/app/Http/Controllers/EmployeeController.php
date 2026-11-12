@@ -10,22 +10,104 @@ use Illuminate\Validation\Rule;
 use Modules\Admin\Models\User;
 use Modules\HRM\Models\Employee;
 use Spatie\Permission\Models\Role;
+use Illuminate\Database\Eloquent\Builder;
 
 class EmployeeController extends Controller
 {
     /**
      * Display a listing of employees.
      */
+
     public function index(Request $request)
     {
-        $employees = Employee::with('user.roles')
-            ->latest()
-            ->paginate($request->get('per_page', 15));
+        $allowedSortColumns = [
+            'id',
+            'employee_code',
+            'name',
+            'department',
+            'designation',
+            'phone',
+            'email',
+            'status',
+            'created_at',
+        ];
+
+        $sortBy = $request->input('sort_by', 'created_at');
+
+        if (!in_array($sortBy, $allowedSortColumns, true)) {
+            $sortBy = 'created_at';
+        }
+
+        $sortDirection = strtolower(
+            $request->input('sort_direction', 'desc')
+        );
+
+        $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
+
+        $query = Employee::with('user.roles');
+
+        $search = trim((string) $request->input('search', ''));
+
+        if ($search !== '') {
+            $query->where(function (Builder $query) use ($search) {
+                $query->where('employee_code', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%")
+                    ->orWhere('department', 'like', "%{$search}%")
+                    ->orWhere('designation', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $filters = $request->input('filter', []);
+
+        foreach ([
+            'employee_code',
+            'name',
+            'department',
+            'designation',
+            'phone',
+            'email',
+        ] as $column) {
+            $value = trim((string) ($filters[$column] ?? ''));
+
+            if ($value !== '') {
+                $query->where($column, 'like', "%{$value}%");
+            }
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['system_access'])) {
+            if ($filters['system_access'] === 'Enabled') {
+                $query->whereHas('user');
+            } elseif ($filters['system_access'] === 'No Login') {
+                $query->whereDoesntHave('user');
+            }
+        }
+
+        if (!empty($filters['role'])) {
+            $role = $filters['role'];
+
+            $query->whereHas('user.roles', function (Builder $query) use ($role) {
+                $query->where('name', $role);
+            });
+        }
+
+        $perPage = (int) $request->input('per_page', 15);
+        $perPage = min(max($perPage, 1), 100);
+
+        $employees = $query
+            ->orderBy($sortBy, $sortDirection)
+            ->paginate($perPage)
+            ->appends($request->query());
 
         return response()->json([
             'success' => true,
             'message' => 'Employees retrieved successfully.',
-            'data' => $employees, 
+            'data' => $employees,
         ]);
     }
 

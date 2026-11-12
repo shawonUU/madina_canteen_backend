@@ -11,35 +11,164 @@ use Modules\Reception\Models\GatePassItem;
 
 class GatePassController extends Controller
 {
+
     public function index(Request $request)
     {
-        $query = GatePass::with([
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'sort_by' => [
+                'nullable', 'string', 'in:code,gate_pass_type,requester,department,purpose,expected_exit_at,status,created_at',
+            ],
+            'sort_dir' => ['nullable', 'in:asc,desc'],
+            'filter' => ['nullable', 'array'],
+            'filter.code' => ['nullable', 'string', 'max:100'],
+            'filter.gate_pass_type' => [ 'nullable', 'in:Person,Person With Material', ],
+            'filter.requester' => ['nullable', 'string', 'max:100'],
+            'filter.department' => ['nullable', 'string', 'max:100'],
+            'filter.purpose' => ['nullable', 'string', 'max:500'],
+            'filter.status' => [ 'nullable', 'in:Pending,Approved,Rejected,Cancelled,Completed', ],
+            'filter.exit_from' => ['nullable', 'date'],
+            'filter.exit_to' => [ 'nullable', 'date', 'after_or_equal:filter.exit_from', ],
+        ]);
+
+        $query = GatePass::query()->with([
             'requester:id,name',
             'items',
             'approvalRequest.levels' => function ($query) {
                 $query->where('status', 'Pending');
             },
             'approvalRequest.levels.approver:id,name',
-        ])->latest();
+        ]);
 
-        if ($request->filled('gate_pass_type')) {
+        $search = trim($validated['search'] ?? '');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhere('gate_pass_type', 'like', "%{$search}%")
+                    ->orWhere('department_name', 'like', "%{$search}%")
+                    ->orWhere('designation_name', 'like', "%{$search}%")
+                    ->orWhere('purpose', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('remarks', 'like', "%{$search}%")
+                    ->orWhereHas('requester', function ($requesterQuery) use ($search) {
+                        $requesterQuery->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('approvalRequest.levels', function ($levelQuery) use ($search) {
+                        $levelQuery->where('status', 'Pending')
+                            ->where(function ($q) use ($search) {
+                                $q->where('level_no', 'like', "%{$search}%")
+                                    ->orWhereHas('approver', function ($approverQuery) use ($search) {
+                                        $approverQuery->where('name', 'like', "%{$search}%");
+                                    });
+                            });
+                    });
+            });
+        }
+
+        $filters = $validated['filter'] ?? [];
+
+        if (!empty($filters['code'])) {
+            $query->where(
+                'code',
+                'like',
+                '%' . $filters['code'] . '%'
+            );
+        }
+
+        if (!empty($filters['gate_pass_type'])) {
             $query->where(
                 'gate_pass_type',
-                $request->gate_pass_type
+                $filters['gate_pass_type']
             );
         }
 
-        if ($request->filled('status')) {
+        if (!empty($filters['requester'])) {
+            $query->whereHas('requester', function ($q) use ($filters) {
+                $q->where(
+                    'name',
+                    'like',
+                    '%' . $filters['requester'] . '%'
+                );
+            });
+        }
+
+        if (!empty($filters['department'])) {
+            $query->where(function ($q) use ($filters) {
+                $value = '%' . $filters['department'] . '%';
+
+                $q->where('department_name', 'like', $value)
+                    ->orWhere('designation_name', 'like', $value);
+            });
+        }
+
+        if (!empty($filters['purpose'])) {
+            $query->where(
+                'purpose',
+                'like',
+                '%' . $filters['purpose'] . '%'
+            );
+        }
+
+        if (!empty($filters['status'])) {
             $query->where(
                 'status',
-                $request->status
+                $filters['status']
             );
         }
 
-        $gatePasses = $query->get();
+        if (!empty($filters['exit_from'])) {
+            $query->whereDate(
+                'expected_exit_at',
+                '>=',
+                $filters['exit_from']
+            );
+        }
 
-        $gatePasses->transform(function ($gatePass) {
+        if (!empty($filters['exit_to'])) {
+            $query->whereDate(
+                'expected_exit_at',
+                '<=',
+                $filters['exit_to']
+            );
+        }
 
+        $sortColumns = [
+            'code' => 'code',
+            'gate_pass_type' => 'gate_pass_type',
+            'department' => 'department_name',
+            'purpose' => 'purpose',
+            'expected_exit_at' => 'expected_exit_at',
+            'status' => 'status',
+            'created_at' => 'created_at',
+        ];
+
+        $sortBy = $validated['sort_by'] ?? 'created_at';
+        $sortDirection = $validated['sort_dir'] ?? 'desc';
+
+        if ($sortBy === 'requester') {
+            $query->orderBy(
+                \Modules\Reception\Models\GatePass::query()
+                    ->getModel()
+                    ->getTable() . '.id',
+                $sortDirection
+            );
+        } else {
+            $query->orderBy(
+                $sortColumns[$sortBy] ?? 'created_at',
+                $sortDirection
+            );
+        }
+
+        $paginator = $query
+            ->orderBy('id', $sortDirection)
+            ->paginate(
+                $validated['per_page'] ?? 25
+            );
+
+        $paginator->getCollection()->transform(function ($gatePass) {
             $pendingLevel = $gatePass->approvalRequest
                 ?->levels
                 ->firstWhere('status', 'Pending');
@@ -56,9 +185,16 @@ class GatePassController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $gatePasses,
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'last_page' => $paginator->lastPage(),
+            ],
         ]);
     }
+
 
     public function store(Request $request)
     {
