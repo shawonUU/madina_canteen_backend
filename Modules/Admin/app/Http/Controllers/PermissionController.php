@@ -2,77 +2,210 @@
 
 namespace Modules\Admin\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Spatie\Permission\Models\Permission;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class PermissionController extends Controller
 {
-
-    // Get All Permissions
     public function index()
     {
-        return response()->json(
-            Permission::all()
-        );
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'permissions' => DB::table('permissions')
+                    ->leftJoin('modules', 'permissions.module_id', '=', 'modules.id')
+                    ->leftJoin('menus', 'permissions.menu_id', '=', 'menus.id')
+                    ->leftJoin('child_menus', 'permissions.child_menu_id', '=', 'child_menus.id')
+                    ->select(
+                        'permissions.*',
+                        'modules.name as module_name',
+                        'menus.name as menu_name',
+                        'child_menus.name as child_menu_name'
+                    )
+                    ->orderByDesc('permissions.id')
+                    ->get(),
+
+                'modules' => DB::table('modules')
+                    ->select('id', 'name')
+                    ->orderBy('name')
+                    ->get(),
+
+                'menus' => DB::table('menus')
+                    ->select('id', 'module_id', 'name')
+                    ->orderBy('name')
+                    ->get(),
+
+                'child_menus' => DB::table('child_menus')
+                    ->select('id', 'menu_id', 'name')
+                    ->orderBy('name')
+                    ->get(),
+            ],
+        ]);
     }
 
-
-    // Create Permission
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|unique:permissions,name'
+        $validated = $this->validatePermission($request);
+
+        $this->validatePermissionLocation($validated);
+
+        $id = DB::table('permissions')->insertGetId([
+            'name' => $validated['name'],
+            'key' => $validated['key'],
+            'module_id' => $validated['module_id'],
+            'menu_id' => $validated['menu_id'] ?? null,
+            'child_menu_id' => $validated['child_menu_id'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'is_active' => $validated['is_active'],
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
-
-
-        $permission = Permission::create([
-            'name' => $request->name,
-            'guard_name' => 'sanctum',
-        ]);
-
 
         return response()->json([
-            'message' => 'Permission created successfully',
-            'data' => $permission
+            'success' => true,
+            'message' => 'Permission created successfully.',
+            'data' => DB::table('permissions')->find($id),
+        ], 201);
+    }
+
+    public function show($id)
+    {
+        $permission = DB::table('permissions')->find($id);
+
+        if (!$permission) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Permission not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $permission,
         ]);
     }
 
-
-    // Update Permission
     public function update(Request $request, $id)
     {
-        $request->validate([
-            'name' => 'required|unique:permissions,name,' . $id
-        ]);
+        $permission = DB::table('permissions')->find($id);
 
+        if (!$permission) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Permission not found.',
+            ], 404);
+        }
 
-        $permission = Permission::findOrFail($id);
+        $validated = $this->validatePermission($request, $id);
 
+        $this->validatePermissionLocation($validated);
 
-        $permission->update([
-            'name' => $request->name,
-            'guard_name' => 'sanctum',
-        ]);
-
+        DB::table('permissions')
+            ->where('id', $id)
+            ->update([
+                'name' => $validated['name'],
+                'key' => $validated['key'],
+                'module_id' => $validated['module_id'],
+                'menu_id' => $validated['menu_id'] ?? null,
+                'child_menu_id' => $validated['child_menu_id'] ?? null,
+                'description' => $validated['description'] ?? null,
+                'is_active' => $validated['is_active'],
+                'updated_at' => now(),
+            ]);
 
         return response()->json([
-            'message' => 'Permission updated successfully',
-            'data' => $permission
+            'success' => true,
+            'message' => 'Permission updated successfully.',
+            'data' => DB::table('permissions')->find($id),
         ]);
     }
 
-
-
-    // Delete Permission
     public function destroy($id)
     {
-        Permission::findOrFail($id)->delete();
+        $permission = DB::table('permissions')->find($id);
 
+        if (!$permission) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Permission not found.',
+            ], 404);
+        }
+
+        DB::table('permissions')->where('id', $id)->delete();
 
         return response()->json([
-            'message' => 'Permission deleted'
+            'success' => true,
+            'message' => 'Permission deleted successfully.',
         ]);
     }
 
+    private function validatePermission(Request $request, ?int $id = null): array
+    {
+        return $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'key' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('permissions', 'key')->ignore($id),
+            ],
+            'module_id' => [
+                'required',
+                'integer',
+                'exists:modules,id',
+            ],
+            'menu_id' => [
+                'nullable',
+                'integer',
+                'exists:menus,id',
+            ],
+            'child_menu_id' => [
+                'nullable',
+                'integer',
+                'exists:child_menus,id',
+            ],
+            'description' => ['nullable', 'string'],
+            'is_active' => ['required', 'boolean'],
+        ]);
+    }
+
+    private function validatePermissionLocation(array $data): void
+    {
+        if (!empty($data['menu_id'])) {
+            $menu = DB::table('menus')
+                ->where('id', $data['menu_id'])
+                ->where('module_id', $data['module_id'])
+                ->first();
+
+            if (!$menu) {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => 'Selected menu does not belong to the selected module.',
+                ], 422));
+            }
+        }
+
+        if (!empty($data['child_menu_id'])) {
+            if (empty($data['menu_id'])) {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => 'Menu is required when selecting a child menu.',
+                ], 422));
+            }
+
+            $childMenu = DB::table('child_menus')
+                ->where('id', $data['child_menu_id'])
+                ->where('menu_id', $data['menu_id'])
+                ->first();
+
+            if (!$childMenu) {
+                abort(response()->json([
+                    'success' => false,
+                    'message' => 'Selected child menu does not belong to the selected menu.',
+                ], 422));
+            }
+        }
+    }
 }

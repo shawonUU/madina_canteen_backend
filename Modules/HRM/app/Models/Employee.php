@@ -6,12 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Sanctum\HasApiTokens;
 use Modules\Admin\Models\User;
-use Spatie\Permission\Traits\HasRoles;
 // use Modules\Employee\Database\Factories\EmployeeFactory;
 
 class Employee extends Model
 {
-    use HasApiTokens, HasFactory, HasRoles;
+    use HasApiTokens, HasFactory;
 
     /**
      * The attributes that are mass assignable.

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Modules\Admin\Models\User;
 use Modules\Admin\Models\UserAccess;
 
@@ -86,48 +88,48 @@ class AuthController extends Controller
         ]);
     }
 
-public function login(Request $request) { 
-    $request->validate([ 
-        'email' => 'required|email', 
-        'password' => 'required', 
-    ]); 
-    $user = User::with('employee') 
-    ->where('email', $request->email) ->first(); 
-    if (!$user) { 
-        return response()->json([ 'message' => 'User not found', ], 404); 
-    } 
-    if ($user->status !== 'Active') { 
-        return response()->json([ 'message' => 'User is inactive', ], 403); 
-    } 
-    if (!Hash::check($request->password, $user->password)) { 
-        return response()->json([ 'message' => 'Invalid credentials', ], 401); 
-    } 
-    $accesses = UserAccess::where('user_id', $user->id) 
-        ->get([ 'id', 'module_id', 'menu_id', 'child_menu_id', 'can_view', 'can_create', 'can_update', 'can_delete', ]) 
-        ->map(function ($permission) { 
-            return [ 
-                'module_id' => $permission->module_id, 
-                'menu_id' => $permission->menu_id, 
-                'child_menu_id' => $permission->child_menu_id, 
-                'can_view' => (bool) $permission->can_view, 
-                'can_create' => (bool) $permission->can_create, 
-                'can_update' => (bool) $permission->can_update, 
-                'can_delete' => (bool) $permission->can_delete,
-            ]; 
-        }) ->values(); 
-    
-    $token = $user->createToken('auth_token')->plainTextToken; 
-    return response()->json([ 
-        'message' => 'Login successful', 
-        'token' => $token, 
-        'user' => [ 'id' => $user->id, 
-        'name' => $user->name, 
-        'email' => $user->email, 
-        'status' => $user->status, 
-        'employee' => $user->employee, ], 
-        'accesses' => $accesses, 
-    ]); 
-}
+    public function login(Request $request) { 
+        $request->validate([ 
+            'email' => 'required|email', 
+            'password' => 'required', 
+        ]); 
+        $user = User::with('employee') 
+        ->where('email', $request->email) ->first(); 
+        if (!$user) { 
+            return response()->json([ 'message' => 'User not found', ], 404); 
+        } 
+        if ($user->status !== 'Active') { 
+            return response()->json([ 'message' => 'User is inactive', ], 403); 
+        } 
+        if (!Hash::check($request->password, $user->password)) { 
+            return response()->json([ 'message' => 'Invalid credentials', ], 401); 
+        } 
+        $accesses = UserAccess::where('user_id', $user->id) 
+            ->get([ 'id', 'module_id', 'menu_id', 'child_menu_id', 'can_view', 'can_create', 'can_update', 'can_delete', ]) 
+            ->map(function ($permission) { 
+                return [ 
+                    'module_id' => $permission->module_id, 
+                    'menu_id' => $permission->menu_id, 
+                    'child_menu_id' => $permission->child_menu_id, 
+                    'can_view' => (bool) $permission->can_view, 
+                    'can_create' => (bool) $permission->can_create, 
+                    'can_update' => (bool) $permission->can_update, 
+                    'can_delete' => (bool) $permission->can_delete,
+                ]; 
+            }) ->values(); 
+        
+        $token = $user->createToken('auth_token')->plainTextToken; 
+        return response()->json([ 
+            'message' => 'Login successful', 
+            'token' => $token, 
+            'user' => [ 'id' => $user->id, 
+            'name' => $user->name, 
+            'email' => $user->email, 
+            'status' => $user->status, 
+            'employee' => $user->employee, ], 
+            'accesses' => $accesses, 
+        ]); 
+    }
 
     public function me(Request $request)
     {
@@ -142,6 +144,92 @@ public function login(Request $request) {
 
         return response()->json([
             'message' => 'Logged out successfully'
+        ]);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $status = Password::broker()->sendResetLink(
+            $request->only('email')
+        );
+
+        if ($status === Password::RESET_LINK_SENT) {
+            return response()->json([
+                'message' => 'Password reset link sent to your email.',
+            ]);
+        }
+
+        if ($status === Password::RESET_THROTTLED) {
+            return response()->json([
+                'message' => 'Please wait before requesting another reset link.',
+            ], 429);
+        }
+
+        return response()->json([
+            'message' => 'Unable to send password reset link.',
+        ], 422);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token' => 'required|string',
+            'email' => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $status = Password::broker()->reset(
+            $request->only(
+                'email',
+                'password',
+                'password_confirmation',
+                'token'
+            ),
+            function ($user, $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                ])->setRememberToken(Str::random(60));
+
+                $user->save();
+            }
+        );
+
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json([
+                'message' => 'Password reset successfully.',
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Invalid or expired password reset token.',
+        ], 422);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'message' => 'Current password is incorrect.',
+            ], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->new_password),
+        ]);
+
+        return response()->json([
+            'message' => 'Password changed successfully.',
         ]);
     }
 

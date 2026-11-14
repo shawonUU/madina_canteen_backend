@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Modules\Admin\Models\User;
 use Modules\HRM\Models\Employee;
-use Spatie\Permission\Models\Role;
 use Illuminate\Database\Eloquent\Builder;
 
 class EmployeeController extends Controller
@@ -86,14 +85,6 @@ class EmployeeController extends Controller
             } elseif ($filters['system_access'] === 'No Login') {
                 $query->whereDoesntHave('user');
             }
-        }
-
-        if (!empty($filters['role'])) {
-            $role = $filters['role'];
-
-            $query->whereHas('user.roles', function (Builder $query) use ($role) {
-                $query->where('name', $role);
-            });
         }
 
         $perPage = (int) $request->input('per_page', 15);
@@ -198,9 +189,6 @@ class EmployeeController extends Controller
                     'password' => Hash::make($validated['user_password']),
                     'status' => 'Active',
                 ]);
-
-                $role = Role::findOrFail($validated['role_id']);
-                $user->assignRole($role);
             }
 
             return $employee;
@@ -354,8 +342,6 @@ class EmployeeController extends Controller
                     ]);
                 }
 
-                $role = Role::findOrFail($validated['role_id']);
-                $user->syncRoles($role);
 
             } elseif ($employee->user) {
 

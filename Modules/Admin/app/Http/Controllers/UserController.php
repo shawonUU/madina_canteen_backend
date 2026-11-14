@@ -14,10 +14,6 @@ class UserController extends Controller
     public function index()
     {
         $users = User::class::query()
-            ->with([
-                'roles',
-                'permissions',
-            ])
             ->get();
 
         return response()->json([

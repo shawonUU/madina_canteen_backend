@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use Modules\Admin\Models\Module;
 use Modules\Admin\Models\Menu;
 use Modules\Admin\Models\ChildMenu;
+use Modules\Admin\Models\Permission;
 
 class MenuSeeder extends Seeder
 {
@@ -24,6 +25,7 @@ class MenuSeeder extends Seeder
                 'icon' => 'ClipboardCheck',
                 'sort_order' => 1,
                 'is_active' => true,
+                'extra_permissions' => [],
 
                 'menus' => [
                     [
@@ -34,8 +36,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'Pending Approvals',
                         'slug' => 'pending-approval',
@@ -44,6 +46,7 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 2,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
                 ],
             ],
@@ -59,9 +62,9 @@ class MenuSeeder extends Seeder
                 'icon' => 'Utensils',
                 'sort_order' => 2,
                 'is_active' => true,
+                'extra_permissions' => [],
 
                 'menus' => [
-
                     [
                         'name' => 'Meal Type',
                         'slug' => 'meal-type',
@@ -70,8 +73,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'Meal Menu',
                         'slug' => 'meal-menu',
@@ -80,8 +83,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 2,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'Meal Booking',
                         'slug' => 'meal-booking',
@@ -90,8 +93,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 3,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'Serve Meal',
                         'slug' => 'serve-meal',
@@ -100,8 +103,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 4,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                 ],
             ],
 
@@ -116,9 +119,9 @@ class MenuSeeder extends Seeder
                 'icon' => 'Building2',
                 'sort_order' => 3,
                 'is_active' => true,
+                'extra_permissions' => [],
 
                 'menus' => [
-
                     [
                         'name' => 'Gate Pass',
                         'slug' => 'gatepass',
@@ -127,6 +130,7 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
+                        'extra_permissions' => [],
 
                         'child_menus' => [
                             [
@@ -137,10 +141,10 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 1,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                         ],
                     ],
-
                 ],
             ],
 
@@ -155,9 +159,9 @@ class MenuSeeder extends Seeder
                 'icon' => 'Users',
                 'sort_order' => 4,
                 'is_active' => true,
+                'extra_permissions' => [],
 
                 'menus' => [
-
                     [
                         'name' => 'Configurations',
                         'slug' => 'configuration',
@@ -166,6 +170,7 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
+                        'extra_permissions' => [],
 
                         'child_menus' => [
                             [
@@ -176,6 +181,7 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 1,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                             [
                                 'name' => 'Designation List',
@@ -185,6 +191,7 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 2,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                         ],
                     ],
@@ -197,6 +204,7 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 2,
                         'is_active' => true,
+                        'extra_permissions' => [],
 
                         'child_menus' => [
                             [
@@ -207,10 +215,10 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 1,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                         ],
                     ],
-
                 ],
             ],
 
@@ -225,9 +233,9 @@ class MenuSeeder extends Seeder
                 'icon' => 'Users',
                 'sort_order' => 5,
                 'is_active' => true,
+                'extra_permissions' => [],
 
                 'menus' => [
-
                     [
                         'name' => 'Meeting Scheduling',
                         'slug' => 'meeting-scheduling',
@@ -236,6 +244,7 @@ class MenuSeeder extends Seeder
                         'icon' => 'CalendarDays',
                         'sort_order' => 1,
                         'is_active' => true,
+                        'extra_permissions' => [],
 
                         'child_menus' => [
                             [
@@ -246,6 +255,7 @@ class MenuSeeder extends Seeder
                                 'icon' => 'List',
                                 'sort_order' => 1,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                             [
                                 'name' => 'Create Meeting',
@@ -255,6 +265,7 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CalendarPlus',
                                 'sort_order' => 2,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                             [
                                 'name' => 'Calendar View',
@@ -264,6 +275,7 @@ class MenuSeeder extends Seeder
                                 'icon' => 'Calendar',
                                 'sort_order' => 3,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                         ],
                     ],
@@ -276,28 +288,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'UserRoundCheck',
                         'sort_order' => 2,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
-                    // [
-                    //     'name' => 'Meeting Agenda',
-                    //     'slug' => 'meeting-agenda',
-                    //     'route' => null,
-                    //     'permission' => null,
-                    //     'icon' => 'ListChecks',
-                    //     'sort_order' => 3,
-                    //     'is_active' => true,
-                    // ],
-
-                    // [
-                    //     'name' => 'Meeting Attendance',
-                    //     'slug' => 'meeting-attendance',
-                    //     'route' => null,
-                    //     'permission' => null,
-                    //     'icon' => 'ClipboardCheck',
-                    //     'sort_order' => 4,
-                    //     'is_active' => true,
-                    // ],
-
                     [
                         'name' => 'Meeting Minutes',
                         'slug' => 'meeting-minutes',
@@ -306,8 +298,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'FileText',
                         'sort_order' => 5,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'Meeting Reports',
                         'slug' => 'meeting-reports',
@@ -316,6 +308,7 @@ class MenuSeeder extends Seeder
                         'icon' => 'ChartNoAxesCombined',
                         'sort_order' => 6,
                         'is_active' => true,
+                        'extra_permissions' => [],
 
                         'child_menus' => [
                             [
@@ -326,6 +319,7 @@ class MenuSeeder extends Seeder
                                 'icon' => 'ChartBar',
                                 'sort_order' => 1,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                             [
                                 'name' => 'Attendance Report',
@@ -335,30 +329,27 @@ class MenuSeeder extends Seeder
                                 'icon' => 'ChartNoAxesCombined',
                                 'sort_order' => 2,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                         ],
                     ],
-
                 ],
             ],
-
 
             /*
             |--------------------------------------------------------------------------
             | Support & Helpdesk
             |--------------------------------------------------------------------------
             */
-
-
             [
                 'name' => 'Support & Helpdesk',
                 'slug' => 'support',
                 'icon' => 'Headset',
                 'sort_order' => 6,
                 'is_active' => true,
+                'extra_permissions' => [],
 
                 'menus' => [
-
                     [
                         'name' => 'Support Dashboard',
                         'slug' => 'support-dashboard',
@@ -367,8 +358,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'LayoutDashboard',
                         'sort_order' => 1,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'Create Ticket',
                         'slug' => 'create-ticket',
@@ -377,8 +368,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'PlusCircle',
                         'sort_order' => 2,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'My Tickets',
                         'slug' => 'my-tickets',
@@ -387,8 +378,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'Ticket',
                         'sort_order' => 3,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'All Tickets',
                         'slug' => 'all-tickets',
@@ -397,8 +388,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'ListChecks',
                         'sort_order' => 4,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'My Assigned Tickets',
                         'slug' => 'my-assigned-tickets',
@@ -407,8 +398,8 @@ class MenuSeeder extends Seeder
                         'icon' => 'UserRoundCheck',
                         'sort_order' => 5,
                         'is_active' => true,
+                        'extra_permissions' => [],
                     ],
-
                     [
                         'name' => 'Reports',
                         'slug' => 'support-reports',
@@ -417,6 +408,7 @@ class MenuSeeder extends Seeder
                         'icon' => 'ChartNoAxesCombined',
                         'sort_order' => 6,
                         'is_active' => true,
+                        'extra_permissions' => [],
 
                         'child_menus' => [
                             [
@@ -427,6 +419,7 @@ class MenuSeeder extends Seeder
                                 'icon' => 'ChartBar',
                                 'sort_order' => 1,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                             [
                                 'name' => 'Resolution Report',
@@ -436,13 +429,12 @@ class MenuSeeder extends Seeder
                                 'icon' => 'Clock',
                                 'sort_order' => 2,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
                         ],
                     ],
-
                 ],
             ],
-
 
             /*
             |--------------------------------------------------------------------------
@@ -455,9 +447,9 @@ class MenuSeeder extends Seeder
                 'icon' => 'Settings',
                 'sort_order' => 7,
                 'is_active' => true,
+                'extra_permissions' => [],
 
                 'menus' => [
-
                     [
                         'name' => 'System Management',
                         'slug' => 'system-management',
@@ -466,9 +458,9 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 1,
                         'is_active' => true,
+                        'extra_permissions' => [],
 
                         'child_menus' => [
-
                             [
                                 'name' => 'Module',
                                 'slug' => 'module',
@@ -477,8 +469,8 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 1,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
-
                             [
                                 'name' => 'Menu',
                                 'slug' => 'menu',
@@ -487,8 +479,8 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 2,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
-
                             [
                                 'name' => 'Child Menu',
                                 'slug' => 'child-menu',
@@ -497,8 +489,8 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 3,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
-
                         ],
                     ],
 
@@ -510,9 +502,9 @@ class MenuSeeder extends Seeder
                         'icon' => 'Circle',
                         'sort_order' => 2,
                         'is_active' => true,
+                        'extra_permissions' => [],
 
                         'child_menus' => [
-
                             [
                                 'name' => 'User Access',
                                 'slug' => 'user-access',
@@ -521,8 +513,8 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 1,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
-
                             [
                                 'name' => 'Permission',
                                 'slug' => 'permission',
@@ -531,8 +523,8 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 2,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
-
                             [
                                 'name' => 'Role',
                                 'slug' => 'role',
@@ -541,21 +533,23 @@ class MenuSeeder extends Seeder
                                 'icon' => 'CircleDot',
                                 'sort_order' => 3,
                                 'is_active' => true,
+                                'extra_permissions' => [],
                             ],
-
                         ],
                     ],
-
                 ],
             ],
         ];
 
-
         foreach ($data as $moduleData) {
 
             $menus = $moduleData['menus'] ?? [];
+            $modulePermissions = $moduleData['extra_permissions'] ?? [];
 
-            unset($moduleData['menus']);
+            unset(
+                $moduleData['menus'],
+                $moduleData['extra_permissions']
+            );
 
             $moduleData['code'] = getGenerateCode(
                 Module::class,
@@ -566,12 +560,20 @@ class MenuSeeder extends Seeder
 
             $module = Module::create($moduleData);
 
+            $this->saveExtraPermissions(
+                $modulePermissions,
+                $module->id
+            );
 
             foreach ($menus as $menuData) {
 
                 $childMenus = $menuData['child_menus'] ?? [];
+                $menuPermissions = $menuData['extra_permissions'] ?? [];
 
-                unset($menuData['child_menus']);
+                unset(
+                    $menuData['child_menus'],
+                    $menuData['extra_permissions']
+                );
 
                 $menuData['module_id'] = $module->id;
 
@@ -584,8 +586,17 @@ class MenuSeeder extends Seeder
 
                 $menu = Menu::create($menuData);
 
+                $this->saveExtraPermissions(
+                    $menuPermissions,
+                    $module->id,
+                    $menu->id
+                );
 
                 foreach ($childMenus as $childMenuData) {
+
+                    $childPermissions = $childMenuData['extra_permissions'] ?? [];
+
+                    unset($childMenuData['extra_permissions']);
 
                     $childMenuData['menu_id'] = $menu->id;
 
@@ -596,9 +607,40 @@ class MenuSeeder extends Seeder
                         8
                     );
 
-                    ChildMenu::create($childMenuData);
+                    $childMenu = ChildMenu::create($childMenuData);
+
+                    $this->saveExtraPermissions(
+                        $childPermissions,
+                        $module->id,
+                        $menu->id,
+                        $childMenu->id
+                    );
                 }
             }
+        }
+    }
+
+    private function saveExtraPermissions(
+        array $permissions,
+        int $moduleId,
+        ?int $menuId = null,
+        ?int $childMenuId = null
+    ): void {
+        foreach ($permissions as $permissionData) {
+
+            Permission::updateOrCreate(
+                [
+                    'key' => $permissionData['key'],
+                ],
+                [
+                    'name' => $permissionData['name'],
+                    'module_id' => $moduleId,
+                    'menu_id' => $menuId,
+                    'child_menu_id' => $childMenuId,
+                    'description' => $permissionData['description'] ?? null,
+                    'is_active' => true,
+                ]
+            );
         }
     }
 }
