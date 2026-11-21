@@ -317,7 +317,6 @@ class SupportTicketController extends Controller
         }
     }
 
-
     private function authorizeTicketAccess(
         Request $request,
         SupportTicket $ticket

@@ -56,8 +56,6 @@ class DatabaseSeeder extends Seeder
             [
                 'code' => getGenerateCode(Employee::class, 'code', 'EMP', 8),
                 'name' => 'Admin User',
-                'department' => 'IT',
-                'designation' => 'System Administrator',
             ]
         );
 
@@ -80,8 +78,6 @@ class DatabaseSeeder extends Seeder
             [
                 'code' => getGenerateCode(Employee::class, 'code', 'EMP', 8),
                 'name' => 'Mojmeen Akther',
-                'department' => 'Accounts & Finance',
-                'designation' => 'AGM',
             ]
         );
 
@@ -104,8 +100,6 @@ class DatabaseSeeder extends Seeder
             [
                 'code' => getGenerateCode(Employee::class, 'code', 'EMP', 8),
                 'name' => 'Jannatul Ferdous',
-                'department' => 'HR',
-                'designation' => 'Senior Executive HR',
             ]
         );
 

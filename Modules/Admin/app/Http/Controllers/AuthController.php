@@ -133,8 +133,13 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
+        $user = $request->user()->load([
+            'employee.departmentRelation',
+            'employee.designationRelation',
+        ]);
+
         return response()->json([
-            'user' => $request->user()
+            'user' => $user,
         ]);
     }
 

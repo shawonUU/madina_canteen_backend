@@ -167,10 +167,8 @@ class ApprovalWorkflowController extends Controller
         ]);
     }
 
-    public function update(
-        Request $request,
-        ApprovalWorkflow $approvalWorkflow
-    ) {
+
+    public function update(  Request $request, ApprovalWorkflow $approvalWorkflow ) {
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -187,14 +185,144 @@ class ApprovalWorkflowController extends Controller
                 'required',
                 'in:Active,Inactive',
             ],
+
+            'levels' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'levels.*.id' => [
+                'nullable',
+                'integer',
+                'exists:approval_workflow_levels,id',
+            ],
+
+            'levels.*.level_no' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+            'levels.*.name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'levels.*.approver_type' => [
+                'required',
+                'in:Role,User,Department Role',
+            ],
+
+            'levels.*.role_id' => [
+                'nullable',
+                'exists:roles,id',
+            ],
+
+            'levels.*.user_id' => [
+                'nullable',
+                'exists:users,id',
+            ],
+
+            'levels.*.department_id' => [
+                'nullable',
+                'exists:departments,id',
+            ],
+
+            'levels.*.min_approvers' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+
+            'levels.*.is_required' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'levels.*.can_reject' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'levels.*.can_return' => [
+                'nullable',
+                'boolean',
+            ],
         ]);
 
-        $approvalWorkflow->update($validated);
+        $workflow = DB::transaction(function () use (
+            $validated,
+            $approvalWorkflow
+        ) {
+            $approvalWorkflow->update([
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'status' => $validated['status'],
+            ]);
+
+            $existingLevelIds = $approvalWorkflow->levels()
+                ->pluck('id')
+                ->toArray();
+
+            $submittedLevelIds = collect($validated['levels'])
+                ->pluck('id')
+                ->filter()
+                ->values()
+                ->toArray();
+
+            // Delete removed levels
+            $approvalWorkflow->levels()
+                ->whereNotIn('id', $submittedLevelIds)
+                ->delete();
+
+            foreach ($validated['levels'] as $level) {
+                $levelData = [
+                    'level_no' => $level['level_no'],
+                    'name' => $level['name'],
+                    'approver_type' => $level['approver_type'],
+                    'role_id' => $level['role_id'] ?? null,
+                    'user_id' => $level['user_id'] ?? null,
+                    'department_id' => $level['department_id'] ?? null,
+                    'min_approvers' => $level['min_approvers'] ?? 1,
+                    'is_required' => $level['is_required'] ?? true,
+                    'can_reject' => $level['can_reject'] ?? true,
+                    'can_return' => $level['can_return'] ?? true,
+                ];
+
+                if (!empty($level['id'])) {
+                    if (!in_array($level['id'], $existingLevelIds)) {
+                        throw new \Illuminate\Validation\ValidationException(
+                            validator([], [])
+                        );
+                    }
+
+                    $approvalWorkflow->levels()
+                        ->where('id', $level['id'])
+                        ->update($levelData);
+                } else {
+                    $approvalWorkflow->levels()->create([
+                        'code' => getGenerateCode(
+                            ApprovalWorkflowLevel::class,
+                            'code',
+                            'AWFL',
+                            8
+                        ),
+                        ...$levelData,
+                        'status' => 'Active',
+                    ]);
+                }
+            }
+
+            return $approvalWorkflow->load('levels');
+        });
 
         return response()->json([
             'status' => 'Success',
             'message' => 'Approval Workflow Updated Successfully.',
-            'data' => $approvalWorkflow,
+            'data' => $workflow,
         ]);
     }
+
 }

@@ -12,8 +12,8 @@ return new class extends Migration
             $table->id();
             $table->string('code')->unique();
             $table->string('name');
-            $table->string('department')->nullable();
-            $table->string('designation')->nullable();
+            $table->bigInteger('department')->nullable();
+            $table->bigInteger('designation')->nullable();
             $table->string('phone', 50)->nullable();
             $table->string('email')->nullable();
 

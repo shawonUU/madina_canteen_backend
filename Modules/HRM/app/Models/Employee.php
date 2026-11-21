@@ -22,6 +22,16 @@ class Employee extends Model
         return $this->hasOne(User::class, 'employee_id');
     }
 
+    public function departmentRelation()
+    {
+        return $this->belongsTo(Department::class, 'department');
+    }
+
+    public function designationRelation()
+    {
+        return $this->belongsTo(Designation::class, 'designation');
+    }
+
     // protected static function newFactory(): EmployeeFactory
     // {
     //     // return EmployeeFactory::new();
