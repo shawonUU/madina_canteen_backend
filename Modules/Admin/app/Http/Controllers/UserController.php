@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Modules\Admin\Models\User;
 
+use Illuminate\Support\Facades\Hash;
 class UserController extends Controller
 {
     public function index()
@@ -53,6 +54,7 @@ class UserController extends Controller
         ]);
 
         $validated['code'] = getGenerateCode(User::class, 'code', 'USR');
+        $validated['password'] = Hash::make($validated['password']);
 
         $user = User::create($validated);
 
@@ -103,6 +105,8 @@ class UserController extends Controller
 
         if (empty($validated['password'])) {
             unset($validated['password']);
+        } else {
+            $validated['password'] = Hash::make($validated['password']);
         }
 
         $user->update($validated);
