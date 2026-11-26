@@ -29,7 +29,7 @@ class DepartmentController extends Controller
         $sortDirection = $request->input('sort_direction', 'desc');
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $query = Department::withCount('designations');
+        $query = Department::query();
 
         $search = trim((string) $request->input('search', ''));
 

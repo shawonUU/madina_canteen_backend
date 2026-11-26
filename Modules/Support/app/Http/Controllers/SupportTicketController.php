@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Modules\Support\Models\SupportTicket;
 use Modules\Support\Models\SupportTicketHistory;
+use Illuminate\Support\Facades\Storage;
+use Modules\Support\Models\SupportTicketAttachment;
 
 use Illuminate\Support\Str;
 class SupportTicketController extends Controller
@@ -64,6 +66,7 @@ class SupportTicketController extends Controller
         ]);
     }
 
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -78,35 +81,84 @@ class SupportTicketController extends Controller
                 'required',
                 Rule::in(SupportTicket::PRIORITIES),
             ],
+            'attachments' => ['nullable', 'array', 'max:10'],
+            'attachments.*' => [
+                'required',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
+            ],
         ]);
 
-        $ticket = DB::transaction(function () use ($request, $validated) {
-            $ticket = SupportTicket::create([
-                ...$validated,
-                'ticket_number' => 'SUP-' . now()->format('YmdHis')
-                    . '-' . strtoupper(\Illuminate\Support\Str::random(5)),
-                'status' => 'open',
-                'submitted_by' => $request->user()->id,
-            ]);
+        $uploadedPaths = [];
 
-            SupportTicketHistory::create([
-                'ticket_id' => $ticket->id,
-                'changed_by' => $request->user()->id,
-                'field_name' => 'status',
-                'old_value' => null,
-                'new_value' => 'open',
-                'note' => 'Ticket created',
-            ]);
+        try {
+            $ticket = DB::transaction(function () use (
+                $request,
+                $validated,
+                &$uploadedPaths
+            ) {
+                $ticket = SupportTicket::create([
+                    'subject' => $validated['subject'],
+                    'description' => $validated['description'],
+                    'module_name' => $validated['module_name'] ?? null,
+                    'issue_type' => $validated['issue_type'],
+                    'priority' => $validated['priority'],
+                    'ticket_number' => 'SUP-' . now()->format('YmdHis')
+                        . '-' . strtoupper(Str::random(5)),
+                    'status' => 'open',
+                    'submitted_by' => $request->user()->id,
+                ]);
 
-            return $ticket;
-        });
+                SupportTicketHistory::create([
+                    'ticket_id' => $ticket->id,
+                    'changed_by' => $request->user()->id,
+                    'field_name' => 'status',
+                    'old_value' => null,
+                    'new_value' => 'open',
+                    'note' => 'Ticket created',
+                ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Support ticket created successfully.',
-            'data' => $ticket->load('submitter:id,name'),
-        ], 201);
+                foreach ($request->file('attachments', []) as $file) {
+                    $path = $file->store(
+                        'support-tickets/' . $ticket->id,
+                        'public'
+                    );
+
+                    $uploadedPaths[] = $path;
+
+                    SupportTicketAttachment::create([
+                        'ticket_id' => $ticket->id,
+                        'reply_id' => null,
+                        'uploaded_by' => $request->user()->id,
+                        'original_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
+                        'mime_type' => $file->getMimeType(),
+                        'file_size' => $file->getSize(),
+                    ]);
+                }
+
+                return $ticket;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Support ticket created successfully.',
+                'data' => $ticket->load([
+                    'submitter:id,name',
+                    'attachments',
+                ]),
+            ], 201);
+
+        } catch (\Throwable $e) {
+            if (!empty($uploadedPaths)) {
+                Storage::disk('public')->delete($uploadedPaths);
+            }
+
+            throw $e;
+        }
     }
+
 
     public function show(Request $request, int $id): JsonResponse
     {
@@ -136,14 +188,11 @@ class SupportTicketController extends Controller
         ]);
     }
 
+
     public function update(Request $request, int $id): JsonResponse
     {
-        $ticket = SupportTicket::findOrFail($id);
         $user = $request->user();
-
-        if (!$user->can('support.ticket.manage')) {
-            abort(403, 'You are not allowed to update this ticket.');
-        }
+        $uploadedPaths = [];
 
         $validated = $request->validate([
             'subject' => ['sometimes', 'required', 'string', 'max:255'],
@@ -159,55 +208,113 @@ class SupportTicketController extends Controller
                 'required',
                 Rule::in(SupportTicket::PRIORITIES),
             ],
-            'status' => [
-                'sometimes',
+            'attachments' => ['nullable', 'array', 'max:10'],
+            'attachments.*' => [
                 'required',
-                Rule::in(SupportTicket::STATUSES),
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
             ],
         ]);
 
-        DB::transaction(function () use ($ticket, $validated, $user) {
-            foreach ($validated as $field => $value) {
-                $oldValue = $ticket->{$field};
+        try {
+            $ticket = DB::transaction(function () use (
+                $id,
+                $user,
+                $validated,
+                $request,
+                &$uploadedPaths
+            ) {
+                $ticket = SupportTicket::whereKey($id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-                if ((string) $oldValue === (string) $value) {
-                    continue;
+                $isOwner = (int) $ticket->submitted_by === (int) $user->id;
+                $canManage = $user->can('support.ticket.manage');
+
+                abort_unless(
+                    $isOwner || $canManage,
+                    403,
+                    'You are not allowed to update this ticket.'
+                );
+
+                abort_unless(
+                    $ticket->status === 'open',
+                    422,
+                    'Only open tickets can be updated. This ticket is no longer editable.'
+                );
+
+                foreach ([
+                    'subject',
+                    'description',
+                    'module_name',
+                    'issue_type',
+                    'priority',
+                ] as $field) {
+                    if (!array_key_exists($field, $validated)) {
+                        continue;
+                    }
+
+                    $oldValue = $ticket->{$field};
+                    $newValue = $validated[$field];
+
+                    if ((string) $oldValue === (string) $newValue) {
+                        continue;
+                    }
+
+                    $ticket->{$field} = $newValue;
+
+                    SupportTicketHistory::create([
+                        'ticket_id' => $ticket->id,
+                        'changed_by' => $user->id,
+                        'field_name' => $field,
+                        'old_value' => $oldValue,
+                        'new_value' => $newValue,
+                        'note' => 'Ticket updated by requester',
+                    ]);
                 }
 
-                $ticket->{$field} = $value;
+                $ticket->save();
 
-                SupportTicketHistory::create([
-                    'ticket_id' => $ticket->id,
-                    'changed_by' => $user->id,
-                    'field_name' => $field,
-                    'old_value' => $oldValue,
-                    'new_value' => $value,
-                ]);
+                foreach ($request->file('attachments', []) as $file) {
+                    $path = $file->store(
+                        'support-tickets/' . $ticket->id,
+                        'public'
+                    );
+
+                    $uploadedPaths[] = $path;
+
+                    SupportTicketAttachment::create([
+                        'ticket_id' => $ticket->id,
+                        'reply_id' => null,
+                        'uploaded_by' => $user->id,
+                        'original_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
+                        'mime_type' => $file->getMimeType(),
+                        'file_size' => $file->getSize(),
+                    ]);
+                }
+
+                return $ticket;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Support ticket updated successfully.',
+                'data' => $ticket->fresh()->load([
+                    'submitter:id,name',
+                    'assignee:id,name',
+                    'attachments',
+                ]),
+            ]);
+
+        } catch (\Throwable $e) {
+            if (!empty($uploadedPaths)) {
+                Storage::disk('public')->delete($uploadedPaths);
             }
 
-            if (isset($validated['status'])) {
-                if ($validated['status'] === 'resolved') {
-                    $ticket->resolved_at = now();
-                }
-
-                if ($validated['status'] === 'closed') {
-                    $ticket->closed_at = now();
-                }
-
-                if ($validated['status'] === 'reopened') {
-                    $ticket->resolved_at = null;
-                    $ticket->closed_at = null;
-                }
-            }
-
-            $ticket->save();
-        });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Ticket updated successfully.',
-            'data' => $ticket->fresh(),
-        ]);
+            throw $e;
+        }
     }
 
     private function authorizeTicketAccess(

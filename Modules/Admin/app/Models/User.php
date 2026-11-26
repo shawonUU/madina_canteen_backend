@@ -7,12 +7,10 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Modules\Admin\Models\UserAccess;
 use Modules\HRM\Models\Employee;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, HasRoles;
+    use HasApiTokens, HasFactory;
 
     /**
      * The attributes that are mass assignable.
@@ -22,10 +20,5 @@ class User extends Authenticatable
     public function employee()
     {
         return $this->belongsTo(Employee::class, 'employee_id', 'id');
-    }
-
-    public function userAccess()
-    {
-        return $this->hasMany(UserAccess::class);
     }
 }

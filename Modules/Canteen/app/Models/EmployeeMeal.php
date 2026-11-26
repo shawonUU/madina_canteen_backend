@@ -2,8 +2,9 @@
 
 namespace Modules\Canteen\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Modules\Admin\Models\Menu;
 use Modules\Admin\Models\User;
 use Modules\HRM\Models\Employee;
 // use Modules\Meal\Database\Factories\EmployeeMealFactory;

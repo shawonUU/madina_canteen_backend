@@ -28,14 +28,10 @@ return new class extends Migration
             ]);
 
             $table->foreignId('role_id')
-                ->nullable()
-                ->constrained('roles')
-                ->nullOnDelete();
+                ->nullable();
 
             $table->foreignId('user_id')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete();
+                ->nullable();
 
             $table->foreignId('department_id')
                 ->nullable();

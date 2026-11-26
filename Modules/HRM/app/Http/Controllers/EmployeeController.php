@@ -3,6 +3,7 @@
 namespace Modules\HRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -10,19 +11,14 @@ use Illuminate\Validation\Rule;
 use Modules\Admin\Models\User;
 use Modules\HRM\Models\Employee;
 use Spatie\Permission\Models\Role;
-use Illuminate\Database\Eloquent\Builder;
 
 class EmployeeController extends Controller
 {
-    /**
-     * Display a listing of employees.
-     */
-
     public function index(Request $request)
     {
         $allowedSortColumns = [
             'id',
-            'employee_code',
+            'code',
             'name',
             'department',
             'designation',
@@ -38,37 +34,35 @@ class EmployeeController extends Controller
             $sortBy = 'created_at';
         }
 
-        $sortDirection = strtolower(
-            $request->input('sort_direction', 'desc')
-        );
-
+        $sortDirection = strtolower($request->input('sort_direction', 'desc'));
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $query = Employee::with('user.roles');
+        $query = Employee::with([
+            // 'user.roles',
+            'departmentRelation:id,name',
+            'designationRelation:id,name',
+        ]);
 
         $search = trim((string) $request->input('search', ''));
 
         if ($search !== '') {
             $query->where(function (Builder $query) use ($search) {
-                $query->where('employee_code', 'like', "%{$search}%")
+                $query->where('code', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhere('department', 'like', "%{$search}%")
-                    ->orWhere('designation', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhereHas('departmentRelation', function (Builder $departmentQuery) use ($search) {
+                        $departmentQuery->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('designationRelation', function (Builder $designationQuery) use ($search) {
+                        $designationQuery->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
         $filters = $request->input('filter', []);
 
-        foreach ([
-            'employee_code',
-            'name',
-            'department',
-            'designation',
-            'phone',
-            'email',
-        ] as $column) {
+        foreach (['code', 'name', 'phone', 'email'] as $column) {
             $value = trim((string) ($filters[$column] ?? ''));
 
             if ($value !== '') {
@@ -76,28 +70,41 @@ class EmployeeController extends Controller
             }
         }
 
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
+        foreach (['department', 'designation'] as $relation) {
+            $value = trim((string) ($filters[$relation] ?? ''));
 
-        if (!empty($filters['system_access'])) {
-            if ($filters['system_access'] === 'Enabled') {
-                $query->whereHas('user');
-            } elseif ($filters['system_access'] === 'No Login') {
-                $query->whereDoesntHave('user');
+            if ($value !== '') {
+                $relationName = $relation . 'Relation';
+
+                $query->whereHas($relationName, function (Builder $relationQuery) use ($value) {
+                    $relationQuery->where('name', 'like', "%{$value}%");
+                });
             }
         }
 
-        if (!empty($filters['role'])) {
-            $role = $filters['role'];
-
-            $query->whereHas('user.roles', function (Builder $query) use ($role) {
-                $query->where('name', $role);
-            });
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        } elseif (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
         }
 
-        $perPage = (int) $request->input('per_page', 15);
-        $perPage = min(max($perPage, 1), 100);
+        if ($request->filled('department')) {
+            $query->where('department', $request->input('department'));
+        }
+
+        if ($request->filled('designation')) {
+            $query->where('designation', $request->input('designation'));
+        }
+
+        $systemAccess = $request->input('system_access', $filters['system_access'] ?? null);
+
+        if ($systemAccess === 'Enabled') {
+            $query->whereHas('user');
+        } elseif ($systemAccess === 'No Login') {
+            $query->whereDoesntHave('user');
+        }
+
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
 
         $employees = $query
             ->orderBy($sortBy, $sortDirection)
@@ -111,36 +118,16 @@ class EmployeeController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created employee.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'department' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
+            'name' => ['required', 'string', 'max:255'],
+            'department' => ['nullable', 'integer', 'exists:departments,id'],
             'designation' => [
                 'nullable',
-                'string',
-                'max:255',
+                'integer',
             ],
-
-            'phone' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
+            'phone' => ['nullable', 'string', 'max:50'],
             'email' => [
                 'required_if:create_user,true',
                 'nullable',
@@ -148,33 +135,13 @@ class EmployeeController extends Controller
                 'max:255',
                 'unique:users,email',
             ],
-
-            'status' => [
-                'nullable',
-                Rule::in(['Active', 'Inactive']),
-            ],
-
-            'create_user' => [
-                'nullable',
-                'boolean',
-            ],
-
-            'role_id' => [
-                'required_if:create_user,true',
-                'nullable',
-                'exists:roles,id',
-            ],
-
-            'user_password' => [
-                'required_if:create_user,true',
-                'nullable',
-                'string',
-                'min:6',
-            ],
+            'status' => ['nullable', Rule::in(['Active', 'Inactive'])],
+            'create_user' => ['nullable', 'boolean'],
+            // 'role_id' => ['required_if:create_user,true', 'nullable', 'integer', 'exists:roles,id'],
+            'user_password' => ['required_if:create_user,true', 'nullable', 'string', 'min:6'],
         ]);
 
         $employee = DB::transaction(function () use ($validated) {
-
             $employee = Employee::create([
                 'code' => getGenerateCode(Employee::class, 'code', 'EMP', 8),
                 'name' => $validated['name'],
@@ -183,10 +150,6 @@ class EmployeeController extends Controller
                 'phone' => $validated['phone'] ?? null,
                 'email' => $validated['email'] ?? null,
                 'status' => $validated['status'] ?? 'Active',
-            ]);
-
-            $employee->update([
-                'employee_code' => 'EMP-' . str_pad($employee->id, 6, '0', STR_PAD_LEFT),
             ]);
 
             if (!empty($validated['create_user'])) {
@@ -199,8 +162,8 @@ class EmployeeController extends Controller
                     'status' => 'Active',
                 ]);
 
-                $role = Role::findOrFail($validated['role_id']);
-                $user->assignRole($role);
+                // $role = Role::findById($validated['role_id']);
+                // $user->syncRoles([$role]);
             }
 
             return $employee;
@@ -209,16 +172,21 @@ class EmployeeController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Employee created successfully.',
-            'data' => $employee->load('user'),
+            'data' => $employee->fresh()->load([
+                'user',
+                'departmentRelation:id,name',
+                'designationRelation:id,name',
+            ]),
         ], 201);
     }
 
-    /**
-     * Display the specified employee.
-     */
     public function show($id)
     {
-        $employee = Employee::with('user')->find($id);
+        $employee = Employee::with([
+            'user',
+            'departmentRelation:id,name',
+            'designationRelation:id,name',
+        ])->find($id);
 
         if (!$employee) {
             return response()->json([
@@ -234,9 +202,6 @@ class EmployeeController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified employee.
-     */
     public function update(Request $request, $id)
     {
         $employee = Employee::with('user')->find($id);
@@ -249,65 +214,26 @@ class EmployeeController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'department' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
+            'name' => ['required', 'string', 'max:255'],
+            'department' => ['nullable', 'integer', 'exists:departments,id'],
             'designation' => [
                 'nullable',
-                'string',
-                'max:255',
+                'integer',
             ],
-
-            'phone' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
+            'phone' => ['nullable', 'string', 'max:50'],
             'email' => [
                 'required_if:create_user,true',
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('users', 'email')->ignore(
-                    $employee->user?->id
-                ),
+                Rule::unique('users', 'email')->ignore($employee->user?->id),
             ],
-
-            'status' => [
-                'nullable',
-                Rule::in(['Active', 'Inactive']),
-            ],
-
-            'create_user' => [
-                'nullable',
-                'boolean',
-            ],
-
-            'role_id' => [
-                'required_if:create_user,true',
-                'nullable',
-                'exists:roles,id',
-            ],
-
-            'user_password' => [
-                'nullable',
-                'string',
-                'min:6',
-            ],
+            'status' => ['nullable', Rule::in(['Active', 'Inactive'])],
+            'create_user' => ['nullable', 'boolean'],
+            'user_password' => ['nullable', 'string', 'min:6'],
         ]);
 
         DB::transaction(function () use ($validated, $employee) {
-
             $employee->update([
                 'name' => $validated['name'],
                 'department' => $validated['department'] ?? null,
@@ -317,14 +243,8 @@ class EmployeeController extends Controller
                 'status' => $validated['status'] ?? 'Active',
             ]);
 
-            $createUser = !empty($validated['create_user']);
-
-            if ($createUser) {
-
-                $user = null;
-
+            if (!empty($validated['create_user'])) {
                 if ($employee->user) {
-
                     $userData = [
                         'name' => $employee->name,
                         'email' => $employee->email,
@@ -332,51 +252,41 @@ class EmployeeController extends Controller
                     ];
 
                     if (!empty($validated['user_password'])) {
-                        $userData['password'] = Hash::make(
-                            $validated['user_password']
-                        );
+                        $userData['password'] = Hash::make($validated['user_password']);
                     }
 
                     $employee->user->update($userData);
                     $user = $employee->user;
-
                 } else {
-
                     $user = User::create([
                         'code' => getGenerateCode(User::class, 'code', 'USR', 8),
                         'employee_id' => $employee->id,
                         'name' => $employee->name,
                         'email' => $employee->email,
-                        'password' => Hash::make(
-                            $validated['user_password']
-                        ),
+                        'password' => Hash::make($validated['user_password']),
                         'status' => 'Active',
                     ]);
                 }
 
-                $role = Role::findOrFail($validated['role_id']);
-                $user->syncRoles($role);
-
+                // $role = Role::findById($validated['role_id']);
+                // $user->syncRoles([$role]);
             } elseif ($employee->user) {
-
-                $employee->user->update([
-                    'status' => 'Inactive',
-                ]);
-
-                $employee->user->syncRoles([]);
+                $employee->user->update(['status' => 'Inactive']);
+                // $employee->user->syncRoles([]);
             }
         });
 
         return response()->json([
             'success' => true,
             'message' => 'Employee updated successfully.',
-            'data' => $employee->fresh()->load('user'),
+            'data' => $employee->fresh()->load([
+                'user',
+                'departmentRelation:id,name',
+                'designationRelation:id,name',
+            ]),
         ]);
     }
 
-    /**
-     * Remove the specified employee.
-     */
     public function destroy($id)
     {
         $employee = Employee::with('user')->find($id);
@@ -389,7 +299,6 @@ class EmployeeController extends Controller
         }
 
         DB::transaction(function () use ($employee) {
-
             if ($employee->user) {
                 $employee->user->delete();
             }
@@ -403,4 +312,3 @@ class EmployeeController extends Controller
         ]);
     }
 }
-

@@ -17,7 +17,6 @@ class DesignationController extends Controller
             'id',
             'code',
             'name',
-            'department_id',
             'status',
             'created_at',
         ];
@@ -31,7 +30,7 @@ class DesignationController extends Controller
         $sortDirection = $request->input('sort_direction', 'desc');
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $query = Designation::with('department:id,code,name');
+        $query = Designation::query();
 
         $search = trim((string) $request->input('search', ''));
 
@@ -39,18 +38,12 @@ class DesignationController extends Controller
             $query->where(function (Builder $query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhereHas('department', function (Builder $departmentQuery) use ($search) {
-                        $departmentQuery->where('name', 'like', "%{$search}%");
-                    });
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
         $filters = $request->input('filter', []);
 
-        if (!empty($filters['department_id'])) {
-            $query->where('department_id', $filters['department_id']);
-        }
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -84,20 +77,11 @@ class DesignationController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'department_id' => [
-                'required',
-                'integer',
-                'exists:departments,id',
-            ],
             'name' => [
                 'required',
                 'string',
                 'max:150',
-                Rule::unique('designations', 'name')
-                    ->where(fn ($query) => $query->where(
-                        'department_id',
-                        $request->input('department_id')
-                    )),
+                Rule::unique('designations', 'name'),
             ],
             'description' => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(['Active', 'Inactive'])],
@@ -105,7 +89,6 @@ class DesignationController extends Controller
 
         $validated['code'] = getGenerateCode(Designation::class, 'code', 'DEG');
         $designation = Designation::create($validated);
-        $designation->load('department:id,code,name');
 
         return response()->json([
             'success' => true,
@@ -116,7 +99,6 @@ class DesignationController extends Controller
 
     public function show(Designation $designation)
     {
-        $designation->load('department:id,code,name');
 
         return response()->json([
             'success' => true,
@@ -128,20 +110,11 @@ class DesignationController extends Controller
     public function update(Request $request, Designation $designation)
     {
         $validated = $request->validate([
-            'department_id' => [
-                'required',
-                'integer',
-                'exists:departments,id',
-            ],
             'name' => [
                 'required',
                 'string',
                 'max:150',
                 Rule::unique('designations', 'name')
-                    ->where(fn ($query) => $query->where(
-                        'department_id',
-                        $request->input('department_id')
-                    ))
                     ->ignore($designation->id),
             ],
             'description' => ['nullable', 'string'],
@@ -149,7 +122,6 @@ class DesignationController extends Controller
         ]);
 
         $designation->update($validated);
-        $designation->load('department:id,code,name');
 
         return response()->json([
             'success' => true,
@@ -173,7 +145,7 @@ class DesignationController extends Controller
         $departments = Department::query()
             ->where('status', 'Active')
             ->orderBy('name')
-            ->get(['id', 'code', 'name']);
+            ->get(['id', 'code', 'name', 'status']);
 
         return response()->json([
             'success' => true,

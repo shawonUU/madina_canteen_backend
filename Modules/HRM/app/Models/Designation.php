@@ -9,8 +9,8 @@ class Designation extends Model
 {
     protected $guarded = [];
 
-    public function department(): BelongsTo
-    {
-        return $this->belongsTo(Department::class);
-    }
+    // public function department(): BelongsTo
+    // {
+    //     return $this->belongsTo(Department::class);
+    // }
 }
