@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Reception\Http\Controllers\GatePassController;
+use Modules\Reception\Http\Controllers\GatePassPurposeController;
 use Modules\Reception\Http\Controllers\ReceptionController;
 
 Route::middleware(['auth:sanctum'])->group(function () {
@@ -10,5 +11,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('reception')->group(function () {
         Route::get('gate-passes/{gatePass}/pdf',[GatePassController::class, 'pdf']);
         Route::apiResource('gate-passes', GatePassController::class);
+        Route::apiResource('gate-pass-purposes', GatePassPurposeController::class);
     });
 });

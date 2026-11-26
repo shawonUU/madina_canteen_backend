@@ -19,12 +19,15 @@ return new class extends Migration
             $table->string('department_name');
             $table->foreignId('designation_id')->nullable();
             $table->string('designation_name');
+            $table->foreignId('purpose_id');
             $table->string('purpose');
             $table->dateTime('expected_exit_at');
             $table->dateTime('expected_return_at')->nullable();
             $table->text('remarks')->nullable();
             $table->enum('status', [ 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed', ])->default('Pending');
             $table->enum('approval_status', [ 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed', ])->default('Pending');
+            $table->bigInteger('created_by')->nullable();
+            $table->bigInteger('updated_by')->nullable();
             $table->timestamps();
             $table->index(['gate_pass_type', 'status']);
             $table->index(['requested_by', 'status']);
