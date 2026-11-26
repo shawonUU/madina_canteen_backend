@@ -21,6 +21,8 @@ return new class extends Migration
             $table->string('asset_no')->nullable();
             $table->string('serial_no')->nullable();
             $table->text('remarks')->nullable();
+            $table->bigInteger('created_by')->nullable();
+            $table->bigInteger('updated_by')->nullable();
             $table->timestamps();
             $table->index('gate_pass_id');
         });

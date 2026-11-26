@@ -123,12 +123,35 @@ class MenuSeeder extends Seeder
 
                 'menus' => [
                     [
+                        'name' => 'Configurations',
+                        'slug' => 'configuration',
+                        'route' => null,
+                        'permission' => null,
+                        'icon' => 'Circle',
+                        'sort_order' => 1,
+                        'is_active' => true,
+                        'extra_permissions' => [],
+
+                        'child_menus' => [
+                            [
+                                'name' => 'Gate Pass Purpose',
+                                'slug' => 'gatepass-purpose',
+                                'route' => '/reception/gatepass/gatepass-purpose',
+                                'permission' => 'gate_pass.create',
+                                'icon' => 'CircleDot',
+                                'sort_order' => 1,
+                                'is_active' => true,
+                                'extra_permissions' => [],
+                            ],
+                        ],
+                    ],
+                    [
                         'name' => 'Gate Pass',
                         'slug' => 'gatepass',
                         'route' => null,
                         'permission' => null,
                         'icon' => 'Circle',
-                        'sort_order' => 1,
+                        'sort_order' => 2,
                         'is_active' => true,
                         'extra_permissions' => [],
 

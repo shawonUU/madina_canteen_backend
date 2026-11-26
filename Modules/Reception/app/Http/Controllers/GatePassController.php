@@ -1,17 +1,19 @@
 <?php
+
 namespace Modules\Reception\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Modules\Approval\Services\ApprovalService;
 use Modules\Reception\Models\GatePass;
 use Modules\Reception\Models\GatePassItem;
+use Modules\Reception\Models\GatePassPurpose;
 
 class GatePassController extends Controller
 {
-
     public function index(Request $request)
     {
         $validated = $request->validate([
@@ -19,18 +21,30 @@ class GatePassController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'search' => ['nullable', 'string', 'max:100'],
             'sort_by' => [
-                'nullable', 'string', 'in:code,gate_pass_type,requester,department,purpose,expected_exit_at,status,created_at',
+                'nullable',
+                'string',
+                'in:code,gate_pass_type,requester,department,purpose,expected_exit_at,status,created_at',
             ],
             'sort_dir' => ['nullable', 'in:asc,desc'],
             'filter' => ['nullable', 'array'],
             'filter.code' => ['nullable', 'string', 'max:100'],
-            'filter.gate_pass_type' => [ 'nullable', 'in:Person,Person With Material', ],
+            'filter.gate_pass_type' => [
+                'nullable',
+                'in:Person,Person With Material',
+            ],
             'filter.requester' => ['nullable', 'string', 'max:100'],
             'filter.department' => ['nullable', 'string', 'max:100'],
             'filter.purpose' => ['nullable', 'string', 'max:500'],
-            'filter.status' => [ 'nullable', 'in:Pending,Approved,Rejected,Cancelled,Completed', ],
+            'filter.status' => [
+                'nullable',
+                'in:Pending,Approved,Rejected,Cancelled,Completed',
+            ],
             'filter.exit_from' => ['nullable', 'date'],
-            'filter.exit_to' => [ 'nullable', 'date', 'after_or_equal:filter.exit_from', ],
+            'filter.exit_to' => [
+                'nullable',
+                'date',
+                'after_or_equal:filter.exit_from',
+            ],
         ]);
 
         $query = GatePass::query()->with([
@@ -150,9 +164,10 @@ class GatePassController extends Controller
 
         if ($sortBy === 'requester') {
             $query->orderBy(
-                \Modules\Reception\Models\GatePass::query()
-                    ->getModel()
-                    ->getTable() . '.id',
+                DB::table('users')
+                    ->select('name')
+                    ->whereColumn('users.id', 'gate_passes.requested_by')
+                    ->limit(1),
                 $sortDirection
             );
         } else {
@@ -164,9 +179,7 @@ class GatePassController extends Controller
 
         $paginator = $query
             ->orderBy('id', $sortDirection)
-            ->paginate(
-                $validated['per_page'] ?? 25
-            );
+            ->paginate($validated['per_page'] ?? 25);
 
         $paginator->getCollection()->transform(function ($gatePass) {
             $pendingLevel = $gatePass->approvalRequest
@@ -195,7 +208,6 @@ class GatePassController extends Controller
         ]);
     }
 
-
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -216,10 +228,9 @@ class GatePassController extends Controller
                 'max:255',
             ],
 
-            'purpose' => [
+            'purpose_id' => [
                 'required',
-                'string',
-                'max:500',
+                'integer',
             ],
 
             'expected_exit_at' => [
@@ -285,10 +296,7 @@ class GatePassController extends Controller
         ]);
 
         if (
-            in_array(
-                $validated['gate_pass_type'],
-                ['material', 'Person With Material']
-            ) &&
+            $validated['gate_pass_type'] === 'Person With Material' &&
             empty($validated['items'])
         ) {
             return response()->json([
@@ -310,64 +318,62 @@ class GatePassController extends Controller
         try {
             DB::beginTransaction();
 
+            $purpose = GatePassPurpose::findOrFail(
+                $validated['purpose_id']
+            );
+
             $gatePass = GatePass::create([
                 'code' => getGenerateCode(GatePass::class, 'code', 'GP'),
 
-                'gate_pass_type' =>
-                    $validated['gate_pass_type'],
+                'gate_pass_type' => $validated['gate_pass_type'],
 
                 'requested_by' => auth()->id(),
 
-                'department_name' =>
-                    $validated['department_name'],
+                'department_name' => $validated['department_name'],
 
-                'designation_name' =>
-                    $validated['designation_name'],
+                'designation_name' => $validated['designation_name'],
 
-                'purpose' =>
-                    $validated['purpose'],
+                'purpose_id' => $purpose->id,
 
-                'expected_exit_at' =>
-                    $validated['expected_exit_at'],
+                'purpose' => $purpose->name,
 
-                'expected_return_at' =>
-                    $validated['expected_return_at'] ?? null,
+                'expected_exit_at' => $validated['expected_exit_at'],
 
-                'remarks' =>
-                    $validated['remarks'] ?? null,
+                'expected_return_at' => $validated['expected_return_at'] ?? null,
 
-                'status' => 'pending',
+                'remarks' => $validated['remarks'] ?? null,
+
+                'status' => 'Pending',
             ]);
 
             if (!empty($validated['items'])) {
                 foreach ($validated['items'] as $item) {
                     $gatePass->items()->create([
-                        'code' => getGenerateCode(GatePassItem::class, 'code', 'GPI'),
-                        'product_id' =>
-                            $item['product_id'] ?? null,
+                        'code' => getGenerateCode(
+                            GatePassItem::class,
+                            'code',
+                            'GPI'
+                        ),
 
-                        'product_name' =>
-                            $item['product_name'],
+                        'product_id' => $item['product_id'] ?? null,
 
-                        'quantity' =>
-                            $item['quantity'],
+                        'product_name' => $item['product_name'],
 
-                        'unit' =>
-                            $item['unit'] ?? null,
+                        'quantity' => $item['quantity'],
 
-                        'asset_no' =>
-                            $item['asset_no'] ?? null,
+                        'unit' => $item['unit'] ?? null,
 
-                        'serial_no' =>
-                            $item['serial_no'] ?? null,
+                        'asset_no' => $item['asset_no'] ?? null,
 
-                        'remarks' =>
-                            $item['remarks'] ?? null,
+                        'serial_no' => $item['serial_no'] ?? null,
+
+                        'remarks' => $item['remarks'] ?? null,
                     ]);
                 }
             }
 
             app(ApprovalService::class)->submit($gatePass);
+
             DB::commit();
 
             $gatePass->load([
@@ -425,10 +431,12 @@ class GatePassController extends Controller
                 'max:255',
             ],
 
-            'purpose' => [
+            'purpose_id' => [
                 'required',
-                'string',
-                'max:500',
+                'integer',
+                Rule::exists('gate_pass_purposes', 'id')
+                    ->where('is_active', true)
+                    ->where('approval_status', 'Approved'),
             ],
 
             'expected_exit_at' => [
@@ -494,10 +502,7 @@ class GatePassController extends Controller
         ]);
 
         if (
-            in_array(
-                $validated['gate_pass_type'],
-                ['material', 'Person With Material']
-            ) &&
+            $validated['gate_pass_type'] === 'Person With Material' &&
             empty($validated['items'])
         ) {
             return response()->json([
@@ -519,29 +524,28 @@ class GatePassController extends Controller
         try {
             DB::beginTransaction();
 
+            $purpose = GatePassPurpose::findOrFail(
+                $validated['purpose_id']
+            );
+
             $gatePass->update([
-                'gate_pass_type' =>
-                    $validated['gate_pass_type'],
+                'gate_pass_type' => $validated['gate_pass_type'],
 
                 'requested_by' => auth()->id(),
 
-                'department_name' =>
-                    $validated['department_name'],
+                'department_name' => $validated['department_name'],
 
-                'designation_name' =>
-                    $validated['designation_name'],
+                'designation_name' => $validated['designation_name'],
 
-                'purpose' =>
-                    $validated['purpose'],
+                'purpose_id' => $purpose->id,
 
-                'expected_exit_at' =>
-                    $validated['expected_exit_at'],
+                'purpose' => $purpose->name,
 
-                'expected_return_at' =>
-                    $validated['expected_return_at'] ?? null,
+                'expected_exit_at' => $validated['expected_exit_at'],
 
-                'remarks' =>
-                    $validated['remarks'] ?? null,
+                'expected_return_at' => $validated['expected_return_at'] ?? null,
+
+                'remarks' => $validated['remarks'] ?? null,
             ]);
 
             $gatePass->items()->delete();
@@ -549,27 +553,26 @@ class GatePassController extends Controller
             if (!empty($validated['items'])) {
                 foreach ($validated['items'] as $item) {
                     $gatePass->items()->create([
-                        'code' => getGenerateCode(GatePassItem::class, 'code', 'GPI', 8),
-                        'product_id' =>
-                            $item['product_id'] ?? null,
+                        'code' => getGenerateCode(
+                            GatePassItem::class,
+                            'code',
+                            'GPI',
+                            8
+                        ),
 
-                        'product_name' =>
-                            $item['product_name'],
+                        'product_id' => $item['product_id'] ?? null,
 
-                        'quantity' =>
-                            $item['quantity'],
+                        'product_name' => $item['product_name'],
 
-                        'unit' =>
-                            $item['unit'] ?? null,
+                        'quantity' => $item['quantity'],
 
-                        'asset_no' =>
-                            $item['asset_no'] ?? null,
+                        'unit' => $item['unit'] ?? null,
 
-                        'serial_no' =>
-                            $item['serial_no'] ?? null,
+                        'asset_no' => $item['asset_no'] ?? null,
 
-                        'remarks' =>
-                            $item['remarks'] ?? null,
+                        'serial_no' => $item['serial_no'] ?? null,
+
+                        'remarks' => $item['remarks'] ?? null,
                     ]);
                 }
             }
@@ -622,7 +625,7 @@ class GatePassController extends Controller
             'requester:id,name',
             'items',
             'approvalRequest.levels' => function ($query) {
-                $query->whereIn('status', ['Approved']);
+                $query->where('status', 'Approved');
             },
             'approvalRequest.levels.approver:id,name',
         ]);
@@ -634,13 +637,10 @@ class GatePassController extends Controller
             ]
         );
 
-        $pdf->setPaper(
-            'A4',
-            'portrait'
-        );
+        $pdf->setPaper('A4', 'portrait');
 
         return $pdf->download(
-            $gatePass->pass_no . '.pdf'
+            $gatePass->code . '.pdf'
         );
     }
 }

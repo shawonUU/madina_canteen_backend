@@ -40,7 +40,7 @@ if (! function_exists('approvalWorkflow')) {
 }
 
 if (! function_exists('getGenerateCode')) {
-    function getGenerateCode($model, $column,  $prefix, $numbers = 8,$noTrash = null){
+    function getGenerateCode($model, $column,  $prefix){
         $lastRecord = $model::orderBy('id', 'desc')->first();
 
         if (!$lastRecord) {return $prefix . '-1';}
