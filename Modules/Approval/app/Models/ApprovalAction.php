@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Approval\Models\ApprovalRequest;
 use Modules\Approval\Models\ApprovalRequestLevel;
-use Modules\Approval\Models\User;
+use Modules\Admin\Models\User;
 
 class ApprovalAction extends Model
 {

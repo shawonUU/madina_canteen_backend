@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Modules\Admin\Models\Permission;
 
 class PermissionController extends Controller
 {
@@ -51,7 +52,7 @@ class PermissionController extends Controller
 
         $this->validatePermissionLocation($validated);
 
-        $id = DB::table('permissions')->insertGetId([
+        $permission = Permission::create([
             'name' => $validated['name'],
             'key' => $validated['key'],
             'module_id' => $validated['module_id'],
@@ -66,13 +67,13 @@ class PermissionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Permission created successfully.',
-            'data' => DB::table('permissions')->find($id),
+            'data' => $permission,
         ], 201);
     }
 
     public function show($id)
     {
-        $permission = DB::table('permissions')->find($id);
+        $permission = Permission::find($id);
 
         if (!$permission) {
             return response()->json([
@@ -89,7 +90,7 @@ class PermissionController extends Controller
 
     public function update(Request $request, $id)
     {
-        $permission = DB::table('permissions')->find($id);
+        $permission = Permission::find($id);
 
         if (!$permission) {
             return response()->json([
@@ -102,9 +103,7 @@ class PermissionController extends Controller
 
         $this->validatePermissionLocation($validated);
 
-        DB::table('permissions')
-            ->where('id', $id)
-            ->update([
+        $permission->update([
                 'name' => $validated['name'],
                 'key' => $validated['key'],
                 'module_id' => $validated['module_id'],
@@ -118,13 +117,13 @@ class PermissionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Permission updated successfully.',
-            'data' => DB::table('permissions')->find($id),
+            'data' => Permission::find($id),
         ]);
     }
 
     public function destroy($id)
     {
-        $permission = DB::table('permissions')->find($id);
+        $permission = Permission::find($id);
 
         if (!$permission) {
             return response()->json([
@@ -133,7 +132,11 @@ class PermissionController extends Controller
             ], 404);
         }
 
-        DB::table('permissions')->where('id', $id)->delete();
+        if (DB::table('user_permissions')->where('permission_id', $id)->exists()
+            || (\Illuminate\Support\Facades\Schema::hasTable('role_permissions') && DB::table('role_permissions')->where('permission_id', $id)->exists())) {
+            return response()->json(['success' => false, 'message' => 'This permission is assigned. Remove assignments or deactivate it first.'], 422);
+        }
+        $permission->delete();
 
         return response()->json([
             'success' => true,

@@ -33,7 +33,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('menus/{id}', [MealMenuController::class, 'show']);
     Route::put('menus/{id}', [MealMenuController::class, 'update']);
     Route::delete('menus/{id}', [MealMenuController::class, 'destroy']);
+    Route::get('booking-menus', [MealMenuController::class, 'approvedMenus']);
+    Route::get('meal-menus', [MealMenuController::class, 'index']);
+    Route::post('meal-menus', [MealMenuController::class, 'store']);
+    Route::get('meal-menus/{id}', [MealMenuController::class, 'show']);
+    Route::put('meal-menus/{id}', [MealMenuController::class, 'update']);
+    Route::delete('meal-menus/{id}', [MealMenuController::class, 'destroy']);
     Route::get('todays-menus', [MealMenuController::class, 'todayMenus']);
+
+    Route::get('my-booked-meals', [EmployeeMealController::class, 'myBookings']);
+    Route::put('meal-bookings/{id}/cancel', [EmployeeMealController::class, 'cancelBooking']);
 
     // Meal Booking
     Route::post('booking-meal', [EmployeeMealController::class, 'bookMeal']);
@@ -43,6 +52,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('meal-bookings/{id}/serve', [ EmployeeMealController::class, 'serveMeal' ]);
 
     // Meal Reports
+    Route::get('meal-reports/cost', [MealReportController::class, 'cost']);
     Route::get('meal-reports/daily', [MealReportController::class, 'daily']);
     Route::get('meal-reports/employee-bookings', [MealReportController::class, 'employeeBookings' ]);
     Route::get('meal-reports/item-consumption', [MealReportController::class,'itemConsumption']);

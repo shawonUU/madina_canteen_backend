@@ -10,6 +10,7 @@ use Modules\Admin\Models\Module;
 use Modules\Admin\Models\User;
 use Modules\Admin\Models\UserAccess;
 use Modules\Admin\Models\Permission;
+use Modules\Admin\Models\UserPermission;
 
 class UserAccessController extends Controller
 {
@@ -248,6 +249,7 @@ class UserAccessController extends Controller
         ]);
 
         DB::transaction(function () use ($validated, $user) {
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
 
             $permissions = [];
             $permissionKeys = [];
@@ -316,12 +318,18 @@ class UserAccessController extends Controller
                 ];
             }
 
-            // Replace existing CRUD permissions
-            UserAccess::where('user_id', $user->id)->delete();
-
-            if (!empty($permissions)) {
-                UserAccess::insert($permissions);
+            $keptIds = [];
+            foreach ($permissions as $attributes) {
+                unset($attributes['created_at'], $attributes['updated_at']);
+                $access = UserAccess::updateOrCreate([
+                    'user_id' => $user->id,
+                    'menu_id' => $attributes['menu_id'],
+                    'child_menu_id' => $attributes['child_menu_id'],
+                ], $attributes);
+                $keptIds[] = $access->id;
             }
+            UserAccess::where('user_id', $user->id)->whereNotIn('id', $keptIds)
+                ->get()->each(fn (UserAccess $access) => $access->delete());
 
             // Update extra permissions when provided
             if (array_key_exists('extra_permissions', $validated)) {
@@ -342,24 +350,11 @@ class UserAccessController extends Controller
                     ]);
                 }
 
-                DB::table('user_permissions')
-                    ->where('user_id', $user->id)
-                    ->delete();
-
-                if (!empty($validPermissionIds)) {
-
-                    $userPermissions = [];
-
-                    foreach ($validPermissionIds as $permissionId) {
-                        $userPermissions[] = [
-                            'user_id' => $user->id,
-                            'permission_id' => $permissionId,
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ];
-                    }
-
-                    DB::table('user_permissions')->insert($userPermissions);
+                UserPermission::where('user_id', $user->id)
+                    ->whereNotIn('permission_id', $validPermissionIds)->get()
+                    ->each(fn (UserPermission $permission) => $permission->delete());
+                foreach ($validPermissionIds as $permissionId) {
+                    UserPermission::firstOrCreate(['user_id' => $user->id, 'permission_id' => $permissionId]);
                 }
             }
         });

@@ -57,6 +57,14 @@ class DesignationController extends Controller
             $query->where('code', 'like', '%' . trim($filters['code']) . '%');
         }
 
+        $description = trim((string) ($filters['description'] ?? ''));
+        if ($description !== '') {
+            $query->where('description', 'like', '%' . $description . '%');
+        }
+        if ($request->boolean('all')) {
+            return response()->json(['success' => true, 'data' => $query->orderBy('name')->get()]);
+        }
+
         $perPage = min(
             max((int) $request->input('per_page', 15), 1),
             100
@@ -132,6 +140,9 @@ class DesignationController extends Controller
 
     public function destroy(Designation $designation)
     {
+        if (\Modules\HRM\Models\Employee::where('designation', $designation->id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'This designation has employees. Reassign them before deleting it.'], 422);
+        }
         $designation->delete();
 
         return response()->json([

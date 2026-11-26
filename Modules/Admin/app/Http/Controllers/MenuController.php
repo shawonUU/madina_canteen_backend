@@ -128,6 +128,12 @@ class MenuController extends Controller
 
     public function destroy(Menu $menu)
     {
+        if (\Illuminate\Support\Facades\DB::table('child_menus')->where('menu_id', $menu->id)->exists() ||
+            \Illuminate\Support\Facades\DB::table('permissions')->where('menu_id', $menu->id)->exists() ||
+            \Illuminate\Support\Facades\DB::table('user_accesses')->where('menu_id', $menu->id)->exists() ||
+            \Illuminate\Support\Facades\DB::table('approval_workflows')->where('menu_id', $menu->id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'This entry is in use. Remove linked records or deactivate it first.'], 422);
+        }
         $menu->delete();
 
         return response()->json([

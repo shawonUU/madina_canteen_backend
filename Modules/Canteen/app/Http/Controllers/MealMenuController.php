@@ -25,8 +25,11 @@ class MealMenuController extends Controller
     public function index(Request $request)
     {
         $query = MealMenu::query()
-            ->with('mealType');
+            ->with(['mealType', 'items']);
 
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
         if ($request->filled('menu_date')) {
             $query->whereDate(
                 'menu_date',
@@ -59,16 +62,13 @@ class MealMenuController extends Controller
             ->get();
 
         $menus->each(function ($menu) {
-            $items = MenuItem::query()
-                ->where('menu_id', $menu->id)
-                ->orderBy('id')
-                ->get();
+            $items = $menu->items->sortBy('id')->values();
 
             $mainItems = $items
                 ->where('item_type', 'Main')
                 ->values();
 
-            $menu->items = $mainItems->map(
+            $menu->setRelation('items', $mainItems->map(
                 function ($main) use ($items) {
 
                     $alternative = $items
@@ -97,13 +97,35 @@ class MealMenuController extends Controller
                             : null,
                     ];
                 }
-            )->values();
+            )->values());
         });
 
         return response()->json([
             'success' => true,
             'data' => $menus,
         ]);
+    }
+
+    public function approvedMenus(Request $request)
+    {
+        $filters = $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'meal_type_id' => ['nullable', 'integer', 'exists:meal_types,id'],
+        ]);
+
+        $menus = MealMenu::query()
+            ->select(['id', 'menu_date', 'meal_type_id', 'status'])
+            ->where('status', 'Approved')
+            ->with('items:id,menu_id,name,item_type,alternative_of')
+            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereDate('menu_date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('menu_date', '<=', $date))
+            ->when($filters['meal_type_id'] ?? null, fn ($query, $id) => $query->where('meal_type_id', $id))
+            ->orderBy('menu_date')
+            ->orderBy('meal_type_id')
+            ->get();
+
+        return response()->json(['success' => true, 'data' => $menus]);
     }
 
 
@@ -429,6 +451,14 @@ public function show($id)
         $oldMealTypeId =
             (int) $menu->meal_type_id;
 
+        if (($oldMenuDate !== $validated['menu_date'] || $oldMealTypeId !== (int) $validated['meal_type_id']) && EmployeeMeal::where('menu_id', $menu->id)->exists()) {
+            throw ValidationException::withMessages(['menu_date' => 'The date and meal type cannot change after this menu has bookings.']);
+        }
+        $submittedIds = collect($validated['items'])->pluck('id')->filter()->map(fn ($id) => (int) $id);
+        if ($submittedIds->isNotEmpty() && $menu->items()->where('item_type', 'Main')->whereIn('id', $submittedIds)->count() !== $submittedIds->unique()->count()) {
+            throw ValidationException::withMessages(['items' => 'One or more items do not belong to this menu.']);
+        }
+
 
         /*
         |--------------------------------------------------------------------------
@@ -510,12 +540,11 @@ public function show($id)
                 |--------------------------------------------------------------------------
                 */
 
-                MenuItem::query()
-                    ->where(
-                        'alternative_of',
-                        $removedMainId
-                    )
-                    ->delete();
+                $removedItems = MenuItem::where('id', $removedMainId)->orWhere('alternative_of', $removedMainId)->get();
+                if (EmployeeMealItem::whereIn('menu_item_id', $removedItems->pluck('id'))->exists()) {
+                    throw ValidationException::withMessages(['items' => 'A booked menu item cannot be removed.']);
+                }
+                $removedItems->sortByDesc('alternative_of')->each->delete();
 
 
                 /*
@@ -533,7 +562,7 @@ public function show($id)
                         'menu_id',
                         $menu->id
                     )
-                    ->delete();
+                    ->get()->each->delete();
             }
 
 
@@ -709,9 +738,15 @@ public function show($id)
                     */
 
                     if ($alternative) {
+                        if (EmployeeMealItem::where('menu_item_id', $alternative->id)->exists()) {
+                            throw ValidationException::withMessages(['items' => 'A booked alternative cannot be removed.']);
+                        }
                         $alternative->delete();
                     }
                 }
+            }
+            if ($menu->approval_status === 'Returned') {
+                app(ApprovalService::class)->submit($menu);
             }
         });
 
@@ -728,40 +763,6 @@ public function show($id)
         $newMealTypeId =
             (int) $validated['meal_type_id'];
 
-
-        if (
-            $oldMenuDate !== $newMenuDate ||
-            $oldMealTypeId !== $newMealTypeId
-        ) {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Remove Old Generated Employee Meals
-            |--------------------------------------------------------------------------
-            */
-
-            EmployeeMeal::query()
-                ->where(
-                    'menu_id',
-                    $menu->id
-                )
-                ->where(
-                    'meal_type_id',
-                    $oldMealTypeId
-                )
-                ->whereDate(
-                    'booking_date',
-                    $oldMenuDate
-                )
-                ->delete();
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Sync Current MealMenu With Advance Bookings
-        |--------------------------------------------------------------------------
-        */
 
         $this->createAdvanceBookingsForMenu( $menu->fresh() );
 
@@ -786,59 +787,18 @@ public function show($id)
     |--------------------------------------------------------------------------
     */
 
-    public function destroy(MealMenu $menu)
+    public function destroy($id)
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Remove Actual Employee Meals
-        |--------------------------------------------------------------------------
-        |
-        | IMPORTANT:
-        | Advance bookings are NOT deleted.
-        |
-        */
-
-        EmployeeMeal::query()
-            ->where(
-                'menu_id',
-                $menu->id
-            )
-            ->delete();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Delete MealMenu Items + MealMenu
-        |--------------------------------------------------------------------------
-        */
-
+        $menu = MealMenu::findOrFail($id);
         DB::transaction(function () use ($menu) {
-
-            MenuItem::query()
-                ->where(
-                    'menu_id',
-                    $menu->id
-                )
-                ->delete();
-
+            if (EmployeeMeal::where('menu_id', $menu->id)->exists()) {
+                throw ValidationException::withMessages(['menu' => 'This menu has bookings and cannot be deleted.']);
+            }
+            $menu->items()->orderByDesc('alternative_of')->get()->each->delete();
             $menu->delete();
         });
-
-
-        return response()->json([
-            'success' => true,
-
-            'message' =>
-                'MealMenu deleted successfully. Advance bookings have been preserved.',
-        ]);
+        return response()->json(['success' => true, 'message' => 'Meal menu deleted successfully.']);
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | TODAY MENUS
-    |--------------------------------------------------------------------------
-    */
 
     public function todayMenus(Request $request)
     {
@@ -877,166 +837,8 @@ public function show($id)
     |
     */
 
-    private function createAdvanceBookingsForMenu( MealMenu $menu ): void {
-
-        // /*
-        // |--------------------------------------------------------------------------
-        // | Get Active Advance Bookings
-        // |--------------------------------------------------------------------------
-        // */
-        // // dd($menu);
-
-        // $mealType = MealType::query()->find($menu->meal_type_id);
-
-        // $advanceBookings =
-        //     AdvanceMealBooking::query()
-        //         ->whereDate(
-        //             'booking_date',
-        //             $menu->menu_date
-        //         )
-        //         ->where(
-        //             'meal_type_id',
-        //             $menu->meal_type_id
-        //         )
-        //         ->where(
-        //             'status',
-        //             'Booked'
-        //         )
-        //         ->get();
-
-
-        // /*
-        // |--------------------------------------------------------------------------
-        // | Create Employee Meal
-        // |--------------------------------------------------------------------------
-        // */
-
-        // // dd($advanceBookings);
-
-        // foreach (
-        //     $advanceBookings
-        //     as $advanceBooking
-        // ) {
-            
-
-        //     /*
-        //     |--------------------------------------------------------------------------
-        //     | Prevent Duplicate Booking
-        //     |--------------------------------------------------------------------------
-        //     */
-
-        //     $employeeMeal =
-        //         EmployeeMeal::firstOrCreate(
-        //             [
-        //                 'employee_id' =>
-        //                     $advanceBooking->employee_id,
-
-        //                 'menu_id' =>
-        //                     $menu->id,
-
-        //                 'meal_type_id' =>
-        //                     $menu->meal_type_id,
-
-        //                 'meal_date' =>
-        //                     $menu->menu_date,
-
-        //                     'total_amount' =>
-        //                         $mealType->meal_rate,
-        //             ],
-        //             [
-        //                 'status' => 'Selected',
-        //             ]
-        //         );
-
-        //     EmployeeMealItem::where(
-        //             'employee_meal_id',
-        //             $employeeMeal->id
-        //         )->delete();
-
-                
-
-        //     foreach ( $menu->items as $item ) {
-
-        //         if($item->item_type === 'Alternative') { continue; }
-
-        //         EmployeeMealItem::create([
-        //             'employee_meal_id' =>
-        //                 $employeeMeal->id,
-
-        //             'menu_item_id' =>
-        //                 $item->id,
-        //             'created_by' => Auth::user()->id,
-        //         ]);
-        //     }
-
-
-        //     /*
-        //     |--------------------------------------------------------------------------
-        //     | If Employee Meal Already Exists
-        //     |--------------------------------------------------------------------------
-        //     */
-
-        //     if (
-        //         $employeeMeal->status !== 'Cancelled'
-        //     ) {
-
-        //         $employeeMeal->update([
-        //             'status' =>
-        //                 'Selected',
-        //         ]);
-        //     }
-        // }
-
-
-        // /*
-        // |--------------------------------------------------------------------------
-        // | Remove Employee Meals For Cancelled
-        // | Advance Bookings
-        // |--------------------------------------------------------------------------
-        // */
-
-        // $cancelledEmployeeIds =
-        //     AdvanceMealBooking::query()
-        //         ->whereDate(
-        //             'booking_date',
-        //             $menu->menu_date
-        //         )
-        //         ->where(
-        //             'meal_type_id',
-        //             $menu->meal_type_id
-        //         )
-        //         ->where(
-        //             'status',
-        //             'Cancelled'
-        //         )
-        //         ->pluck(
-        //             'employee_id'
-        //         );
-
-
-        // if (
-        //     $cancelledEmployeeIds->isNotEmpty()
-        // ) {
-
-        //     EmployeeMeal::query()
-        //         ->where(
-        //             'menu_id',
-        //             $menu->id
-        //         )
-        //         ->where(
-        //             'meal_type_id',
-        //             $menu->meal_type_id
-        //         )
-        //         ->whereDate(
-        //             'meal_date',
-        //             $menu->menu_date
-        //         )
-        //         ->whereIn(
-        //             'employee_id',
-        //             $cancelledEmployeeIds
-        //         )
-        //         ->delete();
-        // }
+    private function createAdvanceBookingsForMenu(MealMenu $menu): void
+    {
+        // Existing bookings are explicit; publishing a menu does not create extra bookings.
     }
 }
-

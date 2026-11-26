@@ -18,6 +18,7 @@ class DepartmentController extends Controller
             'name',
             'status',
             'created_at',
+            'employees_count',
         ];
 
         $sortBy = $request->input('sort_by', 'created_at');
@@ -29,7 +30,7 @@ class DepartmentController extends Controller
         $sortDirection = $request->input('sort_direction', 'desc');
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $query = Department::query();
+        $query = Department::query()->withCount('employees');
 
         $search = trim((string) $request->input('search', ''));
 
@@ -39,6 +40,20 @@ class DepartmentController extends Controller
                     ->orWhere('code', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
             });
+        }
+
+        foreach (['code', 'name', 'description'] as $column) {
+            $value = trim((string) $request->input('filter.' . $column, ''));
+            if ($value !== '') {
+                $query->where($column, 'like', '%' . $value . '%');
+            }
+        }
+        if ($request->filled('filter.employees_count')) {
+            $request->validate(['filter.employees_count' => 'integer|min:0']);
+            $query->has('employees', '=', (int) $request->input('filter.employees_count'));
+        }
+        if ($request->boolean('all')) {
+            return response()->json(['success' => true, 'data' => $query->orderBy('name')->get()]);
         }
 
         $status = $request->input('filter.status');
@@ -86,7 +101,7 @@ class DepartmentController extends Controller
 
     public function show(Department $department)
     {
-        $department->load('designations');
+        $department->loadCount('employees');
 
         return response()->json([
             'success' => true,
@@ -113,16 +128,16 @@ class DepartmentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Department updated successfully.',
-            'data' => $department->fresh()->loadCount('designations'),
+            'data' => $department->fresh()->loadCount('employees'),
         ]);
     }
 
     public function destroy(Department $department)
     {
-        if ($department->designations()->exists()) {
+        if ($department->employees()->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'This department has designations. Delete or reassign them before deleting the department.',
+                'message' => 'This department has employees. Reassign them before deleting the department.',
             ], 422);
         }
 

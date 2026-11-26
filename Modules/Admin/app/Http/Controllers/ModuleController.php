@@ -94,6 +94,11 @@ class ModuleController extends Controller
 
     public function destroy(Module $module)
     {
+        if (\Illuminate\Support\Facades\DB::table('menus')->where('module_id', $module->id)->exists() ||
+            \Illuminate\Support\Facades\DB::table('permissions')->where('module_id', $module->id)->exists() ||
+            \Illuminate\Support\Facades\DB::table('user_accesses')->where('module_id', $module->id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'This entry is in use. Remove linked records or deactivate it first.'], 422);
+        }
         $module->delete();
 
         return response()->json([

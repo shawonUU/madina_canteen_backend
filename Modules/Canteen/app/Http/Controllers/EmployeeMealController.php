@@ -3,10 +3,13 @@
 namespace Modules\Canteen\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Services\AccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Modules\HRM\Models\User;
+use Modules\HRM\Models\Employee;
+use Modules\Canteen\Services\MealRateService;
 use Modules\Canteen\Models\EmployeeMeal;
 use Modules\Canteen\Models\EmployeeMealItem;
 use Modules\Canteen\Models\MealType;
@@ -38,7 +41,7 @@ class EmployeeMealController extends Controller
             'menu_id' => [
                 'nullable',
                 'integer',
-                'exists:menus,id',
+                'exists:meal_menus,id',
             ],
 
             'items' => [
@@ -58,6 +61,8 @@ class EmployeeMealController extends Controller
                 'exists:menu_items,id',
             ],
         ]);
+
+        $this->authorizeEmployee($request, (int) $validated['employee_id']);
 
         /*
         |--------------------------------------------------------------------------
@@ -83,6 +88,7 @@ class EmployeeMealController extends Controller
         if (!empty($validated['menu_id'])) {
             $menu = MealMenu::query()
                 ->where('id', $validated['menu_id'])
+                ->where('status', 'Approved')
                 ->where('meal_type_id', $validated['meal_type_id'])
                 ->whereDate('menu_date', $validated['booking_date'])
                 ->with('items')
@@ -91,7 +97,7 @@ class EmployeeMealController extends Controller
             if (!$menu) {
                 throw ValidationException::withMessages([
                     'menu_id' => [
-                        'The selected menu does not exist for this date and meal type.',
+                        'Choose an approved menu for this date and meal type.',
                     ],
                 ]);
             }
@@ -128,7 +134,7 @@ class EmployeeMealController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $mealRate = $mealType->meal_rate ?? 0;
+        $mealRate = app(MealRateService::class)->forDate($mealType, $validated['booking_date'] ?? $validated['start_date']);
 
         $quantity = 1;
 
@@ -163,6 +169,7 @@ class EmployeeMealController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        $this->validateSelection($menu, $selectedItems);
         if ($selectedItemIds->isNotEmpty()) {
 
             if (!$menu) {
@@ -199,7 +206,8 @@ class EmployeeMealController extends Controller
             $totalAmount,
             $selectedItemIds
         ) {
-            $employeeMeal = EmployeeMeal::create([
+            Employee::whereKey($validated['employee_id'])->lockForUpdate()->firstOrFail();
+            $employeeMeal = $this->saveBooking([
                 'code' => getGenerateCode(EmployeeMeal::class, 'code', 'EME', 8),
                 'employee_id' => $validated['employee_id'],
                 'meal_type_id' => $validated['meal_type_id'],
@@ -277,7 +285,7 @@ class EmployeeMealController extends Controller
             'bookings.*.menu_id' => [
                 'nullable',
                 'integer',
-                'exists:menus,id',
+                'exists:meal_menus,id',
             ],
 
             'bookings.*.items' => [
@@ -297,6 +305,8 @@ class EmployeeMealController extends Controller
                 'exists:menu_items,id',
             ],
         ]);
+
+        $this->authorizeEmployee($request, (int) $validated['employee_id']);
 
         $startDate = \Carbon\Carbon::parse($validated['start_date'])
             ->startOfDay();
@@ -364,6 +374,7 @@ class EmployeeMealController extends Controller
                 $startDate->toDateString(),
                 $endDate->toDateString(),
             ])
+            ->whereIn('meal_date', $bookingDates)
             ->where('status', '!=', 'Cancelled')
             ->pluck('meal_date')
             ->map(fn ($date) => \Carbon\Carbon::parse($date)->toDateString());
@@ -407,6 +418,7 @@ class EmployeeMealController extends Controller
             if (!empty($booking['menu_id'])) {
                 $menu = MealMenu::query()
                     ->where('id', $booking['menu_id'])
+                    ->where('status', 'Approved')
                     ->where('meal_type_id', $validated['meal_type_id'])
                     ->whereDate('menu_date', $bookingDate)
                     ->with('items')
@@ -415,7 +427,7 @@ class EmployeeMealController extends Controller
                 if (!$menu) {
                     throw ValidationException::withMessages([
                         'bookings' => [
-                            "The selected menu does not exist for {$bookingDate}.",
+                            "Choose an approved menu for {$bookingDate}.",
                         ],
                     ]);
                 }
@@ -444,7 +456,8 @@ class EmployeeMealController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            if ($selectedItemIds->isNotEmpty()) {
+            $this->validateSelection($menu, $items);
+        if ($selectedItemIds->isNotEmpty()) {
                 if (!$menu) {
                     throw ValidationException::withMessages([
                         'bookings' => [
@@ -536,8 +549,12 @@ class EmployeeMealController extends Controller
         ) {
             $createdBookings = [];
 
+            Employee::whereKey($validated['employee_id'])->lockForUpdate()->firstOrFail();
+            $mealType = MealType::findOrFail($validated['meal_type_id']);
             foreach ($preparedBookings as $booking) {
-                $employeeMeal = EmployeeMeal::create([
+                $mealRate = app(MealRateService::class)->forDate($mealType, $booking['booking_date']);
+                $totalAmount = $mealRate * $quantity;
+                $employeeMeal = $this->saveBooking([
                     'code' => getGenerateCode(EmployeeMeal::class, 'code', 'EME', 8),
                     'employee_id' => $validated['employee_id'],
                     'meal_type_id' => $validated['meal_type_id'],
@@ -612,7 +629,7 @@ class EmployeeMealController extends Controller
             'menu_id' => [
                 'nullable',
                 'integer',
-                'exists:menus,id',
+                'exists:meal_menus,id',
             ],
 
             'items' => [
@@ -633,7 +650,9 @@ class EmployeeMealController extends Controller
             ],
         ]);
 
-        $employeeMeal = EmployeeMeal::query()
+        $this->authorizeEmployee($request, (int) $validated['employee_id']);
+
+        $employeeMeal = $this->accessibleBookings($request)
             ->find($id);
 
         if (!$employeeMeal) {
@@ -656,6 +675,7 @@ class EmployeeMealController extends Controller
         if (!empty($validated['menu_id'])) {
             $menu = MealMenu::query()
                 ->where('id', $validated['menu_id'])
+                ->where('status', 'Approved')
                 ->where('meal_type_id', $validated['meal_type_id'])
                 ->whereDate('menu_date', $validated['booking_date'])
                 ->with('items')
@@ -664,7 +684,7 @@ class EmployeeMealController extends Controller
             if (!$menu) {
                 throw ValidationException::withMessages([
                     'menu_id' => [
-                        'The selected menu does not exist for this date and meal type.',
+                        'Choose an approved menu for this date and meal type.',
                     ],
                 ]);
             }
@@ -681,7 +701,6 @@ class EmployeeMealController extends Controller
             ->where('meal_type_id', $validated['meal_type_id'])
             ->whereDate('meal_date', $validated['booking_date'])
             ->where('id', '!=', $employeeMeal->id)
-            ->where('status', '!=', 'Cancelled')
             ->exists();
 
         if ($duplicateBooking) {
@@ -701,7 +720,9 @@ class EmployeeMealController extends Controller
         $mealType = MealType::query()
             ->findOrFail($validated['meal_type_id']);
 
-        $mealRate = $mealType->meal_rate ?? 0;
+        $mealRate = ((int) $employeeMeal->meal_type_id === (int) $validated['meal_type_id'] && substr((string) $employeeMeal->meal_date, 0, 10) === $validated['booking_date'])
+            ? (float) $employeeMeal->meal_rate
+            : app(MealRateService::class)->forDate($mealType, $validated['booking_date']);
 
         $quantity = 1;
 
@@ -730,6 +751,7 @@ class EmployeeMealController extends Controller
             ->pluck('selected_item_id')
             ->values();
 
+        $this->validateSelection($menu, $selectedItems);
         if ($selectedItemIds->isNotEmpty()) {
 
             if (!$menu) {
@@ -760,6 +782,7 @@ class EmployeeMealController extends Controller
         */
 
         DB::transaction(function () use (
+            $request,
             $employeeMeal,
             $validated,
             $mealRate,
@@ -767,6 +790,14 @@ class EmployeeMealController extends Controller
             $totalAmount,
             $selectedItemIds
         ) {
+            Employee::whereKey($validated['employee_id'])->lockForUpdate()->firstOrFail();
+            $employeeMeal = $this->accessibleBookings($request)->whereKey($employeeMeal->id)->lockForUpdate()->firstOrFail();
+            if (EmployeeMeal::where('employee_id', $validated['employee_id'])->where('meal_type_id', $validated['meal_type_id'])->whereDate('meal_date', $validated['booking_date'])->where('id', '<>', $employeeMeal->id)->exists()) {
+                throw ValidationException::withMessages(['booking_date' => 'A booking already exists for this meal and date.']);
+            }
+            if ($employeeMeal->status !== 'Selected') {
+                throw ValidationException::withMessages(['status' => 'This booking can no longer be edited.']);
+            }
             $employeeMeal->update([
                 'employee_id' => $validated['employee_id'],
                 'meal_type_id' => $validated['meal_type_id'],
@@ -779,7 +810,7 @@ class EmployeeMealController extends Controller
 
             EmployeeMealItem::query()
                 ->where('employee_meal_id', $employeeMeal->id)
-                ->delete();
+                ->get()->each->delete();
 
             foreach ($selectedItemIds as $menuItemId) {
                 EmployeeMealItem::create([
@@ -824,39 +855,99 @@ class EmployeeMealController extends Controller
         ]);
     }
 
+    public function myBookings(Request $request)
+    {
+        $data = $request->validate([
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'meal_type_id' => ['nullable', 'integer', 'exists:meal_types,id'],
+        ]);
+        $employeeId = $request->user()->employee_id;
+        if (!$employeeId) {
+            throw ValidationException::withMessages(['employee' => 'Your account is not linked to an employee.']);
+        }
+        $query = EmployeeMeal::where('employee_id', $employeeId)->with(['mealType', 'items.menuItem', 'menu.items']);
+        if (!empty($data['date_from'])) $query->whereDate('meal_date', '>=', $data['date_from']);
+        if (!empty($data['date_to'])) $query->whereDate('meal_date', '<=', $data['date_to']);
+        if (!empty($data['meal_type_id'])) $query->where('meal_type_id', $data['meal_type_id']);
+        return response()->json(['success' => true, 'data' => $query->orderByDesc('meal_date')->orderByDesc('id')->get()]);
+    }
+
+    public function cancelBooking(Request $request, $id)
+    {
+        $booking = DB::transaction(function () use ($request, $id) {
+            $booking = $this->accessibleBookings($request)->whereKey($id)->lockForUpdate()->firstOrFail();
+            if ($booking->status !== 'Selected') {
+                throw ValidationException::withMessages(['status' => 'Only a selected booking can be cancelled.']);
+            }
+            $booking->update(['status' => 'Cancelled']);
+            return $booking->fresh();
+        });
+        return response()->json(['success' => true, 'message' => 'Booking cancelled successfully.', 'data' => $booking]);
+    }
+
     public function serveMeal($id)
     {
-        $employeeMeal = EmployeeMeal::find($id);
+        $employeeMeal = DB::transaction(function () use ($id) {
+            $booking = EmployeeMeal::whereKey($id)->lockForUpdate()->firstOrFail();
+            if ($booking->status !== 'Selected') {
+                throw ValidationException::withMessages(['status' => 'Only a selected meal can be served.']);
+            }
+            $booking->update(['status' => 'Served']);
+            return $booking->fresh();
+        });
+        return response()->json(['success' => true, 'message' => 'Meal served successfully.', 'data' => $employeeMeal]);
+    }
 
-        if (!$employeeMeal) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Meal booking not found.',
-            ], 404);
+    private function authorizeEmployee(Request $request, int $employeeId): void
+    {
+        abort_unless(
+            (int) $request->user()->employee_id === $employeeId
+                || app(AccessService::class)->can($request->user(), 'meal_booking.manage-on-behalf'),
+            403,
+            'You can only manage your own meal bookings.'
+        );
+    }
+
+    private function accessibleBookings(Request $request): Builder
+    {
+        $query = EmployeeMeal::query();
+        if (!app(AccessService::class)->can($request->user(), 'meal_booking.manage-on-behalf')) {
+            $query->where('employee_id', $request->user()->employee_id ?? 0);
         }
+        return $query;
+    }
 
-        if ($employeeMeal->status === 'Cancelled') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cancelled meal cannot be served.',
-            ], 422);
+    private function validateSelection(?MealMenu $menu, $selection): void
+    {
+        if ($selection->isEmpty()) return;
+        if (!$menu) throw ValidationException::withMessages(['items' => 'Select a menu before choosing items.']);
+        $groups = [];
+        foreach ($selection as $choice) {
+            $item = $menu->items->firstWhere('id', $choice['selected_item_id']);
+            $mainId = $choice['main_item_id'] ?: ($item?->alternative_of ?: $item?->id);
+            $main = $menu->items->firstWhere('id', $mainId);
+            if (!$item || !$main || $main->item_type !== 'Main' || ((int) $item->id !== (int) $mainId && (int) $item->alternative_of !== (int) $mainId) || isset($groups[$mainId])) {
+                throw ValidationException::withMessages(['items' => 'Choose one valid main item or its alternative for each menu item.']);
+            }
+            $groups[$mainId] = true;
         }
+    }
 
-        if ($employeeMeal->status === 'Served') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Meal has already been served.',
-            ], 422);
+    private function saveBooking(array $attributes): EmployeeMeal
+    {
+        $booking = EmployeeMeal::where('employee_id', $attributes['employee_id'])
+            ->where('meal_type_id', $attributes['meal_type_id'])
+            ->whereDate('meal_date', $attributes['meal_date'])->lockForUpdate()->first();
+        if ($booking && $booking->status !== 'Cancelled') {
+            throw ValidationException::withMessages(['booking_date' => 'This employee already has a booking for the selected meal and date.']);
         }
-
-        $employeeMeal->update([
-            'status' => 'Served',
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Meal served successfully.',
-            'data' => $employeeMeal->fresh(),
-        ]);
+        if ($booking) {
+            unset($attributes['code'], $attributes['created_by']);
+            $booking->items()->get()->each->delete();
+            $booking->update($attributes);
+            return $booking;
+        }
+        return EmployeeMeal::create($attributes);
     }
 }

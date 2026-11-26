@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Approval\Models\ApprovalWorkflowLevel;
-use Modules\Approval\Models\User;
+use Modules\Admin\Models\User;
 
 class ApprovalWorkflow extends Model
 {

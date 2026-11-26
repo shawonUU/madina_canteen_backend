@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Modules\Canteen\Models\MealMenu;
+use Modules\Canteen\Models\EmployeeMeal;
 use Modules\Canteen\Models\MealType;
 use Modules\Canteen\Models\MealRate;
 
@@ -38,7 +42,7 @@ class MealTypeController extends Controller
         $mealTypes = $query
             ->orderBy('id', 'desc')
             ->paginate(
-                $request->get('per_page', 15)
+                min(500, max(1, (int) $request->get('per_page', 15)))
             );
 
         return response()->json([
@@ -87,12 +91,16 @@ class MealTypeController extends Controller
             ],
         ]);
 
+        if (MealType::where('slug', Str::slug($validated['name']))->exists()) {
+            throw ValidationException::withMessages(['name' => 'A meal type with a similar name already exists.']);
+        }
         $mealType = DB::transaction(function () use ($validated) {
 
             // Create Meal Type
             $mealType = MealType::create([
                 'code' => getGenerateCode(MealType::class, 'code', 'MTY', 8),
                 'name' => $validated['name'],
+                'slug' => Str::slug($validated['name']),
                 'description' => $validated['description'] ?? null,
                 'booking_cutoff_time' => $validated['booking_cutoff_time'],
                 'meal_rate' => $validated['meal_rate'],
@@ -104,6 +112,7 @@ class MealTypeController extends Controller
                 'code' => getGenerateCode(MealRate::class, 'code', 'MRT', 8),
                 'meal_type_id' => $mealType->id,
                 'rate' => $validated['meal_rate'],
+                'effective_date' => now()->toDateString(),
                 'status' => 'Active',
                 'created_by' => auth()->id(),
             ]);
@@ -212,27 +221,27 @@ class MealTypeController extends Controller
             /*
              * If rate changed:
              *
-             * 1. Previous history becomes Inactive
+             * 1. A superseded rate on the same date becomes Inactive
              * 2. New rate is inserted into meal_rates
              * 3. meal_types.meal_rate gets updated
              */
             if ($rateChanged) {
 
-                // Deactivate previous active rate
+                // Retain earlier and future schedules for their effective dates.
                 MealRate::where(
                     'meal_type_id',
                     $mealType->id
                 )
                 ->where('status', 'Active')
-                ->update([
-                    'status' => 'Inactive',
-                ]);
+                ->whereDate('effective_date', now()->toDateString())
+                ->get()->each->update(['status' => 'Inactive']);
 
                 // Insert new rate history
                 MealRate::create([
                     'code' => getGenerateCode(MealRate::class, 'code', 'MRT', 8),
                     'meal_type_id' => $mealType->id,
                     'rate' => $validated['meal_rate'],
+                'effective_date' => now()->toDateString(),
                     'status' => 'Active',
                     'created_by' => auth()->id(),
                 ]);
@@ -264,13 +273,16 @@ class MealTypeController extends Controller
             ], 404);
         }
 
+        if (MealMenu::where('meal_type_id', $mealType->id)->exists() || EmployeeMeal::where('meal_type_id', $mealType->id)->exists()) {
+            throw ValidationException::withMessages(['meal_type' => 'This meal type has menus or bookings. Set it inactive instead.']);
+        }
         DB::transaction(function () use ($mealType) {
 
             // Delete meal rate history
             MealRate::where(
                 'meal_type_id',
                 $mealType->id
-            )->delete();
+            )->get()->each->delete();
 
             // Delete meal type
             $mealType->delete();

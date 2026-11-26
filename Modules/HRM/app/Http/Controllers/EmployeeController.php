@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Modules\Admin\Models\User;
 use Modules\HRM\Models\Employee;
-use Spatie\Permission\Models\Role;
 
 class EmployeeController extends Controller
 {
@@ -38,7 +37,7 @@ class EmployeeController extends Controller
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
         $query = Employee::with([
-            // 'user.roles',
+            'user',
             'departmentRelation:id,name',
             'designationRelation:id,name',
         ]);
@@ -62,6 +61,14 @@ class EmployeeController extends Controller
 
         $filters = $request->input('filter', []);
 
+        foreach (['employee' => ['code', 'name'], 'contact' => ['phone', 'email']] as $key => $fields) {
+            $value = trim((string) ($filters[$key] ?? ''));
+            if ($value !== '') {
+                $query->where(function (Builder $q) use ($fields, $value) {
+                    foreach ($fields as $field) $q->orWhere($field, 'like', '%' . $value . '%');
+                });
+            }
+        }
         foreach (['code', 'name', 'phone', 'email'] as $column) {
             $value = trim((string) ($filters[$column] ?? ''));
 
@@ -99,7 +106,9 @@ class EmployeeController extends Controller
         $systemAccess = $request->input('system_access', $filters['system_access'] ?? null);
 
         if ($systemAccess === 'Enabled') {
-            $query->whereHas('user');
+            $query->whereHas('user', fn (Builder $q) => $q->where('status', 'Active'));
+        } elseif ($systemAccess === 'Disabled') {
+            $query->whereHas('user', fn (Builder $q) => $q->where('status', 'Inactive'));
         } elseif ($systemAccess === 'No Login') {
             $query->whereDoesntHave('user');
         }
@@ -126,6 +135,7 @@ class EmployeeController extends Controller
             'designation' => [
                 'nullable',
                 'integer',
+                'exists:designations,id',
             ],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => [
@@ -138,7 +148,7 @@ class EmployeeController extends Controller
             'status' => ['nullable', Rule::in(['Active', 'Inactive'])],
             'create_user' => ['nullable', 'boolean'],
             // 'role_id' => ['required_if:create_user,true', 'nullable', 'integer', 'exists:roles,id'],
-            'user_password' => ['required_if:create_user,true', 'nullable', 'string', 'min:6'],
+            'user_password' => ['required_if:create_user,true', 'nullable', 'string', 'min:8'],
         ]);
 
         $employee = DB::transaction(function () use ($validated) {
@@ -159,7 +169,7 @@ class EmployeeController extends Controller
                     'name' => $employee->name,
                     'email' => $employee->email,
                     'password' => Hash::make($validated['user_password']),
-                    'status' => 'Active',
+                    'status' => $employee->status,
                 ]);
 
                 // $role = Role::findById($validated['role_id']);
@@ -219,6 +229,7 @@ class EmployeeController extends Controller
             'designation' => [
                 'nullable',
                 'integer',
+                'exists:designations,id',
             ],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => [
@@ -230,9 +241,12 @@ class EmployeeController extends Controller
             ],
             'status' => ['nullable', Rule::in(['Active', 'Inactive'])],
             'create_user' => ['nullable', 'boolean'],
-            'user_password' => ['nullable', 'string', 'min:6'],
+            'user_password' => [Rule::requiredIf($request->boolean('create_user') && !$employee->user), 'nullable', 'string', 'min:8'],
         ]);
 
+        if (!array_key_exists('create_user', $validated)) {
+            $validated['create_user'] = $employee->user?->status === 'Active';
+        }
         DB::transaction(function () use ($validated, $employee) {
             $employee->update([
                 'name' => $validated['name'],
@@ -248,7 +262,7 @@ class EmployeeController extends Controller
                     $userData = [
                         'name' => $employee->name,
                         'email' => $employee->email,
-                        'status' => 'Active',
+                        'status' => $employee->status,
                     ];
 
                     if (!empty($validated['user_password'])) {
@@ -256,6 +270,7 @@ class EmployeeController extends Controller
                     }
 
                     $employee->user->update($userData);
+                    if ($employee->user->status === 'Inactive' || isset($userData['password'])) $employee->user->tokens()->delete();
                     $user = $employee->user;
                 } else {
                     $user = User::create([
@@ -264,7 +279,7 @@ class EmployeeController extends Controller
                         'name' => $employee->name,
                         'email' => $employee->email,
                         'password' => Hash::make($validated['user_password']),
-                        'status' => 'Active',
+                        'status' => $employee->status,
                     ]);
                 }
 
@@ -272,6 +287,7 @@ class EmployeeController extends Controller
                 // $user->syncRoles([$role]);
             } elseif ($employee->user) {
                 $employee->user->update(['status' => 'Inactive']);
+                $employee->user->tokens()->delete();
                 // $employee->user->syncRoles([]);
             }
         });
@@ -298,8 +314,21 @@ class EmployeeController extends Controller
             ], 404);
         }
 
+        if ($employee->user && (int) $employee->user->id === (int) auth()->id()) {
+            return response()->json(['success' => false, 'message' => 'You cannot delete your own employee account.'], 422);
+        }
+        if ($employee->user) {
+            return response()->json(['success' => false, 'message' => 'This employee has a login account. Deactivate the employee or manage the linked account in Users first.'], 422);
+        }
+        $references = ['employee_meals' => 'employee_id', 'gate_passes' => 'employee_id', 'meeting_participants' => 'employee_id', 'meeting_attendances' => 'employee_id'];
+        foreach ($references as $table => $column) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn($table, $column) && DB::table($table)->where($column, $employee->id)->exists()) {
+                return response()->json(['success' => false, 'message' => 'This employee has transaction history. Mark the employee Inactive instead.'], 422);
+            }
+        }
         DB::transaction(function () use ($employee) {
             if ($employee->user) {
+                $employee->user->tokens()->delete();
                 $employee->user->delete();
             }
 

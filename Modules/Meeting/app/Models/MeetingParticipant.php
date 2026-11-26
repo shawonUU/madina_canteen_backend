@@ -9,6 +9,12 @@ use Modules\HRM\Models\Employee;
 class MeetingParticipant extends Model
 {
     protected $guarded = [];
+    protected $appends = ['attendance_status'];
+
+    public function getAttendanceStatusAttribute(): ?string
+    {
+        return $this->attendance?->status;
+    }
 
     protected function casts(): array
     {
@@ -28,6 +34,6 @@ class MeetingParticipant extends Model
 
     public function attendance() 
     {
-        return $this->hasOne(MeetingAttendance::class);
+        return $this->hasOne(MeetingAttendance::class, 'meeting_participant_id');
     }
 }

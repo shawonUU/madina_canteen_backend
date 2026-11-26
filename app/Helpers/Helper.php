@@ -4,21 +4,21 @@ use Modules\Approval\Models\ApprovalWorkflow;
 
 if (! function_exists('moduleId')) {
     function moduleId(): ?int{
-        $value = request()->header('X-Module-Id');
+        $value = request()->attributes->get('navigation_context')['module_id'] ?? null;
         return $value !== null ? (int) $value : null;
     }
 }
 
 if (! function_exists('menuId')) {
     function menuId(): ?int{
-        $value = request()->header('X-Menu-Id');
+        $value = request()->attributes->get('navigation_context')['menu_id'] ?? null;
         return $value !== null ? (int) $value : null;
     }
 }
 
 if (! function_exists('childMenuId')) {
     function childMenuId(): ?int{
-        $value = request()->header('X-Child-Menu-Id');
+        $value = request()->attributes->get('navigation_context')['child_menu_id'] ?? null;
         return $value !== null ? (int) $value : null;
     }
 }
@@ -41,11 +41,6 @@ if (! function_exists('approvalWorkflow')) {
 
 if (! function_exists('getGenerateCode')) {
     function getGenerateCode($model, $column,  $prefix){
-        $lastRecord = $model::orderBy('id', 'desc')->first();
-
-        if (!$lastRecord) {return $prefix . '-1';}
-        $lastCode = $lastRecord->{$column};
-        $number = (int) str_replace($prefix . '-', '', $lastCode);
-        return $prefix . '-' . ($number + 1);
+        return app(\App\Services\RecordCodeService::class)->next($model, $column, $prefix);
     }
 }

@@ -8,35 +8,18 @@ use Illuminate\Routing\Controller;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Modules\Meeting\Models\Meeting;
+use Modules\Meeting\Services\MeetingAccess;
+use Modules\Meeting\Services\MeetingQuery;
 
 class MeetingController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, MeetingQuery $meetings): JsonResponse
     {
-        $meetings = Meeting::query()
-            ->withCount('participants')
-            ->when($request->filled('search'), function ($query) use ($request) {
-                $search = $request->search;
-
-                $query->where(function ($q) use ($search) {
-                    $q->where('title', 'like', "%{$search}%")
-                        ->orWhere('meeting_number', 'like', "%{$search}%");
-                });
-            })
-            ->when($request->filled('status'), function ($query) use ($request) {
-                $query->where('status', $request->status);
-            })
-            ->when($request->filled('date_from'), function ($query) use ($request) {
-                $query->whereDate('meeting_date', '>=', $request->date_from);
-            })
-            ->when($request->filled('date_to'), function ($query) use ($request) {
-                $query->whereDate('meeting_date', '<=', $request->date_to);
-            })
-            ->orderByDesc('meeting_date')
-            ->orderBy('start_time')
-            ->paginate($request->integer('per_page', 15));
-
-        return response()->json($meetings);
+        $query = $meetings->build($request);
+        if ($request->boolean('options')) {
+            return response()->json(['data' => $query->select(['id', 'meeting_number', 'title', 'meeting_date', 'start_time', 'end_time', 'status', 'location', 'meeting_type', 'organizer_id', 'chairperson_id'])->orderByDesc('meeting_date')->get()]);
+        }
+        return response()->json($meetings->sort($query, $request)->paginate(max(1, min($request->integer('per_page', 25), 100))));
     }
 
     public function store(Request $request): JsonResponse
@@ -48,8 +31,9 @@ class MeetingController extends Controller
                 'required',
                 Rule::in(['internal', 'external', 'online', 'hybrid']),
             ],
-            'chairperson_id' => ['nullable', 'integer'],
-            'department_id' => ['nullable', 'integer'],
+            'organizer_id' => ['nullable', 'integer', 'exists:users,id'],
+            'chairperson_id' => ['nullable', 'integer', 'exists:users,id'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'meeting_date' => ['required', 'date'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => [
@@ -70,7 +54,8 @@ class MeetingController extends Controller
             . '-'
             . Str::upper(Str::random(4));
 
-        $data['organizer_id'] = $request->user()->getAuthIdentifier();
+        $data['organizer_id'] = $data['organizer_id'] ?? $request->user()->getAuthIdentifier();
+        abort_if((int) $data['organizer_id'] !== (int) $request->user()->id && !$request->user()->can('meeting.manage-all'), 403, 'You cannot create meetings for another organizer.');
         $data['status'] = $data['status'] ?? 'scheduled';
 
         $meeting = Meeting::create($data);
@@ -81,14 +66,19 @@ class MeetingController extends Controller
         ], 201);
     }
 
-    public function show(Meeting $meeting): JsonResponse
+    public function show(Request $request, Meeting $meeting): JsonResponse
     {
+        MeetingAccess::authorizeView($request->user(), $meeting);
+        $meeting->loadCount('participants');
         $meeting->load([
-            'participants',
-            'agendas',
-            'attendances',
-            'minutes',
+            'organizer:id,name',
+            'chairperson:id,name',
+            'participants.employee:id,name',
+            'participants.attendance',
         ]);
+        if ($request->user()->can('meeting.agenda.view')) $meeting->load('agendas');
+        if ($request->user()->can('meeting.attendance.view')) $meeting->load('attendances');
+        if ($request->user()->can('meeting.minutes.view')) $meeting->load('minutes');
 
         return response()->json([
             'data' => $meeting,
@@ -97,6 +87,7 @@ class MeetingController extends Controller
 
     public function update(Request $request, Meeting $meeting): JsonResponse
     {
+        MeetingAccess::authorizeManage($request->user(), $meeting);
         $data = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -104,8 +95,9 @@ class MeetingController extends Controller
                 'sometimes',
                 Rule::in(['internal', 'external', 'online', 'hybrid']),
             ],
-            'chairperson_id' => ['nullable', 'integer'],
-            'department_id' => ['nullable', 'integer'],
+            'organizer_id' => ['nullable', 'integer', 'exists:users,id'],
+            'chairperson_id' => ['nullable', 'integer', 'exists:users,id'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'meeting_date' => ['sometimes', 'required', 'date'],
             'start_time' => ['sometimes', 'required', 'date_format:H:i'],
             'end_time' => ['sometimes', 'required', 'date_format:H:i'],
@@ -117,6 +109,7 @@ class MeetingController extends Controller
                     'draft',
                     'scheduled',
                     'ongoing',
+                    'in_progress',
                     'completed',
                     'cancelled',
                 ]),
@@ -124,8 +117,12 @@ class MeetingController extends Controller
             'cancellation_reason' => ['nullable', 'string'],
         ]);
 
-        $startTime = $data['start_time'] ?? $meeting->start_time;
-        $endTime = $data['end_time'] ?? $meeting->end_time;
+        if (array_key_exists('organizer_id', $data)) {
+            $data['organizer_id'] = $data['organizer_id'] ?? $meeting->organizer_id;
+            abort_if((int) $data['organizer_id'] !== (int) $meeting->organizer_id && !$request->user()->can('meeting.manage-all'), 403, 'You cannot change the meeting organizer.');
+        }
+        $startTime = substr($data['start_time'] ?? $meeting->start_time, 0, 5);
+        $endTime = substr($data['end_time'] ?? $meeting->end_time, 0, 5);
 
         if ($endTime <= $startTime) {
             return response()->json([
@@ -146,8 +143,9 @@ class MeetingController extends Controller
         ]);
     }
 
-    public function destroy(Meeting $meeting): JsonResponse
+    public function destroy(Request $request, Meeting $meeting): JsonResponse
     {
+        MeetingAccess::authorizeManage($request->user(), $meeting);
         $meeting->delete();
 
         return response()->json([

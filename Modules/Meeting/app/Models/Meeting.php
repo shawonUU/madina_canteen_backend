@@ -6,12 +6,32 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Admin\Models\User;
+use Modules\Meeting\Services\MeetingAccess;
 
 class Meeting extends Model
 {
     use SoftDeletes;
 
     protected $guarded = [];
+    protected $appends = ['can_manage'];
+
+    public function getCanManageAttribute(): bool
+    {
+        return auth()->user() instanceof User && MeetingAccess::canManage(auth()->user(), $this);
+    }
+
+    public function organizer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'organizer_id');
+    }
+
+    public function chairperson(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'chairperson_id');
+    }
+
 
     protected function casts(): array
     {

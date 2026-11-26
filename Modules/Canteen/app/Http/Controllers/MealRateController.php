@@ -4,181 +4,78 @@ namespace Modules\Canteen\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 use Modules\Canteen\Models\MealRate;
+use Modules\Canteen\Models\MealType;
+use Modules\Canteen\Services\MealRateService;
 
 class MealRateController extends Controller
 {
-    /**
-     * Display a listing of meal rates.
-     */
     public function index(Request $request)
     {
-        $query = MealRate::query();
-
-        // Filter by status
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+        $query = MealRate::with('mealType:id,name');
+        foreach (['status', 'meal_type_id', 'rate'] as $field) {
+            if ($request->filled($field)) $query->where($field, $request->input($field));
         }
-
-        // Filter by meal type
-        if ($request->filled('meal_type_id')) {
-            $query->where('meal_type_id', $request->meal_type_id);
-        }
-
-        // Search by rate
-        if ($request->filled('rate')) {
-            $query->where('rate', $request->rate);
-        }
-
-        $mealRates = $query
-            ->orderBy('effective_date', 'desc')
-            ->orderBy('id', 'desc')
-            ->paginate($request->get('per_page', 15));
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Meal rates retrieved successfully.',
-            'data' => $mealRates,
-        ]);
+        return response()->json(['success' => true, 'data' => $query->orderByDesc('effective_date')->orderByDesc('id')
+            ->paginate(min(500, max(1, (int) $request->input('per_page', 25))))]);
     }
 
-    /**
-     * Store a newly created meal rate.
-     */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'meal_type_id' => [
-                'required',
-                'integer',
-            ],
-
-            'rate' => [
-                'required',
-                'numeric',
-                'min:0',
-            ],
-
-            'effective_date' => [
-                'required',
-                'date',
-            ],
-
-            'status' => [
-                'nullable',
-                Rule::in(['Active', 'Inactive']),
-            ],
-        ]);
-
-        $mealRate = MealRate::create([
-            'code' => getGenerateCode(MealRate::class, 'code', 'MRT', 8),
-            'meal_type_id' => $validated['meal_type_id'],
-            'rate' => $validated['rate'],
-            'effective_date' => $validated['effective_date'],
-            'status' => $validated['status'] ?? 'Active',
-            'created_by' => Auth::id(),
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Meal rate created successfully.',
-            'data' => $mealRate,
-        ], 201);
+        $data = $this->validated($request);
+        $rate = DB::transaction(function () use ($data) {
+            $type = MealType::whereKey($data['meal_type_id'])->lockForUpdate()->firstOrFail();
+            $rate = MealRate::create($data + ['code' => getGenerateCode(MealRate::class, 'code', 'MRT'), 'status' => 'Active']);
+            $this->syncRate($type);
+            return $rate->load('mealType:id,name');
+        });
+        return response()->json(['success' => true, 'message' => 'Meal rate created successfully.', 'data' => $rate], 201);
     }
 
-    /**
-     * Display the specified meal rate.
-     */
     public function show($id)
     {
-        $mealRate = MealRate::find($id);
-
-        if (!$mealRate) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Meal rate not found.',
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Meal rate retrieved successfully.',
-            'data' => $mealRate,
-        ]);
+        return response()->json(['success' => true, 'data' => MealRate::with('mealType:id,name')->findOrFail($id)]);
     }
 
-    /**
-     * Update the specified meal rate.
-     */
     public function update(Request $request, $id)
     {
-        $mealRate = MealRate::find($id);
+        $data = $this->validated($request);
+        $rate = DB::transaction(function () use ($data, $id) {
+            $rate = MealRate::whereKey($id)->lockForUpdate()->firstOrFail();
+            $oldType = $rate->meal_type_id;
+            $rate->update($data);
+            foreach (array_unique([$oldType, $rate->meal_type_id]) as $typeId) {
+                $this->syncRate(MealType::whereKey($typeId)->lockForUpdate()->firstOrFail());
+            }
+            return $rate->fresh()->load('mealType:id,name');
+        });
+        return response()->json(['success' => true, 'message' => 'Meal rate updated successfully.', 'data' => $rate]);
+    }
 
-        if (!$mealRate) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Meal rate not found.',
-            ], 404);
-        }
+    public function destroy($id)
+    {
+        DB::transaction(function () use ($id) {
+            $rate = MealRate::whereKey($id)->lockForUpdate()->firstOrFail();
+            $type = MealType::whereKey($rate->meal_type_id)->lockForUpdate()->firstOrFail();
+            $rate->delete();
+            $this->syncRate($type);
+        });
+        return response()->json(['success' => true, 'message' => 'Meal rate deleted successfully. Existing booking amounts were preserved.']);
+    }
 
-        $validated = $request->validate([
-            'meal_type_id' => [
-                'sometimes',
-                'required',
-                'integer',
-            ],
-
-            'rate' => [
-                'sometimes',
-                'required',
-                'numeric',
-                'min:0',
-                'max:99999999.99',
-            ],
-
-            'effective_date' => [
-                'sometimes',
-                'required',
-                'date',
-            ],
-
-            'status' => [
-                'sometimes',
-                'required',
-                Rule::in(['Active', 'Inactive']),
-            ],
-        ]);
-
-        $mealRate->update($validated);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Meal rate updated successfully.',
-            'data' => $mealRate->fresh(),
+    private function validated(Request $request): array
+    {
+        return $request->validate([
+            'meal_type_id' => ['required', 'integer', 'exists:meal_types,id'],
+            'rate' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
+            'effective_date' => ['required', 'date_format:Y-m-d'],
+            'status' => ['sometimes', 'required', 'in:Active,Inactive'],
         ]);
     }
 
-    /**
-     * Remove the specified meal rate.
-     */
-    public function destroy($id)
+    private function syncRate(MealType $type): void
     {
-        $mealRate = MealRate::find($id);
-
-        if (!$mealRate) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Meal rate not found.',
-            ], 404);
-        }
-
-        $mealRate->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Meal rate deleted successfully.',
-        ]);
+        $type->update(['meal_rate' => app(MealRateService::class)->forDate($type, now()->toDateString())]);
     }
 }

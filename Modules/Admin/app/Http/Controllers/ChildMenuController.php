@@ -128,6 +128,11 @@ class ChildMenuController extends Controller
 
     public function destroy(ChildMenu $childMenu)
     {
+        if (\Illuminate\Support\Facades\DB::table('permissions')->where('child_menu_id', $childMenu->id)->exists() ||
+            \Illuminate\Support\Facades\DB::table('user_accesses')->where('child_menu_id', $childMenu->id)->exists() ||
+            \Illuminate\Support\Facades\DB::table('approval_workflows')->where('child_menu_id', $childMenu->id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'This entry is in use. Remove linked records or deactivate it first.'], 422);
+        }
         $childMenu->delete();
 
         return response()->json([

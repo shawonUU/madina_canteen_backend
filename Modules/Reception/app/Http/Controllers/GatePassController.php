@@ -7,6 +7,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Modules\Approval\Services\ApprovalService;
 use Modules\Reception\Models\GatePass;
 use Modules\Reception\Models\GatePassItem;
@@ -28,17 +29,12 @@ class GatePassController extends Controller
             'sort_dir' => ['nullable', 'in:asc,desc'],
             'filter' => ['nullable', 'array'],
             'filter.code' => ['nullable', 'string', 'max:100'],
-            'filter.gate_pass_type' => [
-                'nullable',
-                'in:Person,Person With Material',
-            ],
+            'filter.gate_pass_type' => ['nullable', 'string', 'max:100'],
             'filter.requester' => ['nullable', 'string', 'max:100'],
             'filter.department' => ['nullable', 'string', 'max:100'],
             'filter.purpose' => ['nullable', 'string', 'max:500'],
-            'filter.status' => [
-                'nullable',
-                'in:Pending,Approved,Rejected,Cancelled,Completed',
-            ],
+            'filter.status' => ['nullable', 'string', 'max:100'],
+            'filter.expected_exit_at' => ['nullable', 'string', 'max:30'],
             'filter.exit_from' => ['nullable', 'date'],
             'filter.exit_to' => [
                 'nullable',
@@ -94,8 +90,8 @@ class GatePassController extends Controller
 
         if (!empty($filters['gate_pass_type'])) {
             $query->where(
-                'gate_pass_type',
-                $filters['gate_pass_type']
+                'gate_pass_type', 'like',
+                '%' . $filters['gate_pass_type'] . '%'
             );
         }
 
@@ -128,11 +124,14 @@ class GatePassController extends Controller
 
         if (!empty($filters['status'])) {
             $query->where(
-                'status',
-                $filters['status']
+                'status', 'like',
+                '%' . $filters['status'] . '%'
             );
         }
 
+        if (!empty($filters['expected_exit_at'])) {
+            $query->where(fn ($dates) => $dates->where('expected_exit_at', 'like', '%' . $filters['expected_exit_at'] . '%')->orWhere('expected_return_at', 'like', '%' . $filters['expected_exit_at'] . '%'));
+        }
         if (!empty($filters['exit_from'])) {
             $query->whereDate(
                 'expected_exit_at',
@@ -204,6 +203,8 @@ class GatePassController extends Controller
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
                 'last_page' => $paginator->lastPage(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
             ],
         ]);
     }
@@ -229,8 +230,8 @@ class GatePassController extends Controller
             ],
 
             'purpose_id' => [
-                'required',
-                'integer',
+                'required', 'integer',
+                Rule::exists('gate_pass_purposes', 'id')->where('is_active', true)->where('approval_status', 'Approved'),
             ],
 
             'expected_exit_at' => [
@@ -256,7 +257,8 @@ class GatePassController extends Controller
 
             'items.*.product_id' => [
                 'nullable',
-                'exists:products,id',
+                'integer',
+                'min:1',
             ],
 
             'items.*.product_name' => [
@@ -387,13 +389,16 @@ class GatePassController extends Controller
                 'data' => $gatePass,
             ], 201);
 
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Throwable $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create gate pass.',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -462,7 +467,8 @@ class GatePassController extends Controller
 
             'items.*.product_id' => [
                 'nullable',
-                'exists:products,id',
+                'integer',
+                'min:1',
             ],
 
             'items.*.product_name' => [
@@ -531,7 +537,6 @@ class GatePassController extends Controller
             $gatePass->update([
                 'gate_pass_type' => $validated['gate_pass_type'],
 
-                'requested_by' => auth()->id(),
 
                 'department_name' => $validated['department_name'],
 
@@ -548,7 +553,7 @@ class GatePassController extends Controller
                 'remarks' => $validated['remarks'] ?? null,
             ]);
 
-            $gatePass->items()->delete();
+            $gatePass->items()->get()->each->delete();
 
             if (!empty($validated['items'])) {
                 foreach ($validated['items'] as $item) {
@@ -577,6 +582,9 @@ class GatePassController extends Controller
                 }
             }
 
+            if ($gatePass->approval_status === 'Returned') {
+                app(ApprovalService::class)->submit($gatePass);
+            }
             DB::commit();
 
             $gatePass->load([
@@ -590,13 +598,16 @@ class GatePassController extends Controller
                 'data' => $gatePass,
             ]);
 
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Throwable $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update gate pass.',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -604,13 +615,22 @@ class GatePassController extends Controller
     public function destroy(GatePass $gatePass)
     {
         try {
-            $gatePass->delete();
+            DB::transaction(function () use ($gatePass) {
+                $approval = $gatePass->approvalRequest;
+                if ($approval && in_array($approval->status, ['Pending', 'Returned', 'Approved'], true)) {
+                    throw ValidationException::withMessages(['gate_pass' => 'A gate pass with an active or approved approval request cannot be deleted.']);
+                }
+                $gatePass->items()->get()->each->delete();
+                $gatePass->delete();
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Gate pass deleted successfully.',
             ]);
 
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,

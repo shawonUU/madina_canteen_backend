@@ -14,6 +14,7 @@ class GatePassPurpose extends Model
      * The attributes that are mass assignable.
      */
     protected $guarded = [];
+    protected $casts = ['is_active' => 'boolean'];
 
     // protected static function newFactory(): GatePassPurposeFactory
     // {

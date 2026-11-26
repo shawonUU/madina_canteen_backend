@@ -9,28 +9,35 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Modules\Support\Models\SupportTicket;
 use Modules\Support\Models\SupportTicketHistory;
+use Modules\Support\Services\SupportAccess;
+use Modules\Admin\Models\User;
 
 class SupportAssignmentController extends Controller
 {
+    public function assignees(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->can('support.ticket.assign'), 403, 'You cannot assign tickets.');
+        $users = User::query()->where('status', 'Active')->select(['id', 'name'])
+            ->when($request->filled('search'), fn ($query) => $query->where('name', 'like', '%' . $request->input('search') . '%'))
+            ->orderBy('name')->get();
+        return response()->json(['data' => $users]);
+    }
+
     public function assign(Request $request, int $id): JsonResponse
     {
-        // abort_unless(
-        //     $request->user()->can('support.ticket.manage'),
-        //     403,
-        //     'You are not allowed to assign tickets.'
-        // );
+        abort_unless($request->user()->can('support.ticket.assign'), 403, 'You are not allowed to assign tickets.');
 
         $validated = $request->validate([
             'assigned_to' => [
                 'required',
                 'integer',
-                'exists:users,id',
+                Rule::exists('users', 'id')->where('status', 'Active'),
             ],
         ]);
 
-        $ticket = SupportTicket::findOrFail($id);
-
-        DB::transaction(function () use ($ticket, $validated, $request) {
+        $ticket = DB::transaction(function () use ($id, $validated, $request) {
+            $ticket = SupportTicket::whereKey($id)->lockForUpdate()->firstOrFail();
+            SupportAccess::authorize($request->user(), $ticket);
             $oldAssignee = $ticket->assigned_to;
             $newAssignee = (int) $validated['assigned_to'];
 
@@ -52,6 +59,7 @@ class SupportAssignmentController extends Controller
                     'note' => 'Ticket assigned to support staff.',
                 ]);
             }
+            return $ticket;
         });
 
         return response()->json([
@@ -77,14 +85,14 @@ class SupportAssignmentController extends Controller
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $ticket = SupportTicket::findOrFail($id);
-
-        DB::transaction(function () use ($ticket, $validated, $request) {
+        $ticket = DB::transaction(function () use ($id, $validated, $request) {
+            $ticket = SupportTicket::whereKey($id)->lockForUpdate()->firstOrFail();
+            SupportAccess::authorize($request->user(), $ticket);
             $oldStatus = $ticket->status;
             $newStatus = $validated['status'];
 
             if ($oldStatus === $newStatus) {
-                return;
+                return $ticket;
             }
 
             $ticket->status = $newStatus;
@@ -116,6 +124,7 @@ class SupportAssignmentController extends Controller
                 'new_value' => $newStatus,
                 'note' => $validated['note'] ?? null,
             ]);
+            return $ticket;
         });
 
         return response()->json([

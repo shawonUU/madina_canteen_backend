@@ -7,11 +7,13 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Meeting\Models\Meeting;
 use Modules\Meeting\Models\MeetingAgenda;
+use Modules\Meeting\Services\MeetingAccess;
 
 class MeetingAgendaController extends Controller
 {
-    public function index(Meeting $meeting): JsonResponse
+    public function index(Request $request, Meeting $meeting): JsonResponse
     {
+        MeetingAccess::authorizeView($request->user(), $meeting);
         return response()->json([
             'data' => $meeting->agendas()->get(),
         ]);
@@ -19,11 +21,14 @@ class MeetingAgendaController extends Controller
 
     public function store(Request $request, Meeting $meeting): JsonResponse
     {
+        MeetingAccess::authorizeManage($request->user(), $meeting);
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'sort_order' => ['sometimes', 'integer', 'min:1'],
-            'presenter_id' => ['nullable', 'integer'],
+            'presenter_id' => ['nullable', 'integer', 'exists:users,id'],
+            'presenter' => ['nullable', 'string', 'max:255'],
+            'duration_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
         ]);
 
         $agenda = $meeting->agendas()->create($data);
@@ -35,10 +40,12 @@ class MeetingAgendaController extends Controller
     }
 
     public function show(
+        Request $request,
         Meeting $meeting,
         MeetingAgenda $agenda
     ): JsonResponse {
-        abort_unless($agenda->meeting_id === $meeting->id, 404);
+        MeetingAccess::authorizeView($request->user(), $meeting);
+        abort_unless((int) $agenda->meeting_id === (int) $meeting->id, 404);
 
         return response()->json(['data' => $agenda]);
     }
@@ -48,13 +55,16 @@ class MeetingAgendaController extends Controller
         Meeting $meeting,
         MeetingAgenda $agenda
     ): JsonResponse {
-        abort_unless($agenda->meeting_id === $meeting->id, 404);
+        MeetingAccess::authorizeManage($request->user(), $meeting);
+        abort_unless((int) $agenda->meeting_id === (int) $meeting->id, 404);
 
         $data = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'sort_order' => ['sometimes', 'integer', 'min:1'],
-            'presenter_id' => ['nullable', 'integer'],
+            'presenter_id' => ['nullable', 'integer', 'exists:users,id'],
+            'presenter' => ['nullable', 'string', 'max:255'],
+            'duration_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
         ]);
 
         $agenda->update($data);
@@ -66,10 +76,12 @@ class MeetingAgendaController extends Controller
     }
 
     public function destroy(
+        Request $request,
         Meeting $meeting,
         MeetingAgenda $agenda
     ): JsonResponse {
-        abort_unless($agenda->meeting_id === $meeting->id, 404);
+        MeetingAccess::authorizeManage($request->user(), $meeting);
+        abort_unless((int) $agenda->meeting_id === (int) $meeting->id, 404);
 
         $agenda->delete();
 

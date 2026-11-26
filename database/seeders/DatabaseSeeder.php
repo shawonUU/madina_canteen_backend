@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Modules\Admin\Database\Seeders\MenuSeeder;
@@ -49,7 +50,7 @@ class DatabaseSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        $adminEmployee = Employee::updateOrCreate(
+        $adminEmployee = Employee::firstOrCreate(
             [
                 'email' => 'admin@gmail.com',
             ],
@@ -59,7 +60,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $admin = User::updateOrCreate(
+        $admin = User::firstOrCreate(
             [
                 'email' => 'admin@gmail.com',
             ],
@@ -71,7 +72,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $mojmeenEmployee = Employee::updateOrCreate(
+        $mojmeenEmployee = Employee::firstOrCreate(
             [
                 'email' => 'mojmeen@gmail.com',
             ],
@@ -81,7 +82,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        User::updateOrCreate(
+        User::firstOrCreate(
             [
                 'email' => 'mojmeen@gmail.com',
             ],
@@ -93,7 +94,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $hrEmployee = Employee::updateOrCreate(
+        $hrEmployee = Employee::firstOrCreate(
             [
                 'email' => 'hr@gmail.com',
             ],
@@ -103,7 +104,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        User::updateOrCreate(
+        User::firstOrCreate(
             [
                 'email' => 'hr@gmail.com',
             ],

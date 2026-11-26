@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Support\Models\SupportTicket;
 use Modules\Support\Models\SupportTicketHistory;
 use Modules\Support\Models\SupportTicketReply;
+use Modules\Support\Services\SupportAccess;
 
 class SupportTicketReplyController extends Controller
 {
@@ -17,9 +18,10 @@ class SupportTicketReplyController extends Controller
         $ticket = SupportTicket::findOrFail($ticketId);
         $user = $request->user();
 
-        $isSupportStaff = $user->can('support.ticket.manage');
+        $isSupportStaff = $user->can('support.ticket.internal');
+        SupportAccess::authorize($user, $ticket);
 
-        $hasAccess = $isSupportStaff
+        $hasAccess = $user->can('support.ticket.manage')
             || (int) $ticket->submitted_by === (int) $user->id
             || (int) $ticket->assigned_to === (int) $user->id;
 
@@ -46,6 +48,8 @@ class SupportTicketReplyController extends Controller
             $validated,
             $isSupportStaff
         ) {
+            $ticket = SupportTicket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+            abort_if(in_array($ticket->status, ['closed', 'resolved'], true), 422, 'This ticket is not accepting replies.');
             $reply = SupportTicketReply::create([
                 'ticket_id' => $ticket->id,
                 'user_id' => $user->id,

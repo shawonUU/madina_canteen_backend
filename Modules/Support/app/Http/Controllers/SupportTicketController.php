@@ -13,59 +13,14 @@ use Illuminate\Support\Facades\Storage;
 use Modules\Support\Models\SupportTicketAttachment;
 
 use Illuminate\Support\Str;
+use Modules\Support\Services\SupportAccess;
+use Modules\Support\Services\SupportTicketQuery;
 class SupportTicketController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, SupportTicketQuery $tickets): JsonResponse
     {
-        $user = $request->user();
-        $canViewAll = $user->can('support.ticket.view-all');
-
-        $query = SupportTicket::query()
-            ->with([
-                'submitter:id,name',
-                'assignee:id,name',
-            ])
-            ->when(!$canViewAll, function ($query) use ($user) {
-                $query->where(function ($query) use ($user) {
-                    $query->where('submitted_by', $user->id)
-                        ->orWhere('assigned_to', $user->id);
-                });
-            })
-            ->when($request->filled('status'), function ($query) use ($request) {
-                $query->where('status', $request->status);
-            })
-            ->when($request->filled('priority'), function ($query) use ($request) {
-                $query->where('priority', $request->priority);
-            })
-            ->when($request->filled('module_name'), function ($query) use ($request) {
-                $query->where('module_name', $request->module_name);
-            })
-            ->when($request->filled('search'), function ($query) use ($request) {
-                $search = $request->search;
-
-                $query->where(function ($query) use ($search) {
-                    $query->where('ticket_number', 'like', "%{$search}%")
-                        ->orWhere('subject', 'like', "%{$search}%");
-                });
-            })
-            ->latest();
-
-        $tickets = $query->paginate(
-            min((int) $request->input('per_page', 15), 100)
-        );
-
-        return response()->json([
-            'success' => true,
-            'data' => $tickets->items(),
-            'meta' => [
-                'current_page' => $tickets->currentPage(),
-                'per_page' => $tickets->perPage(),
-                'total' => $tickets->total(),
-                'last_page' => $tickets->lastPage(),
-            ],
-        ]);
+        return response()->json($tickets->paginate($tickets->build($request), $request));
     }
-
 
     public function store(Request $request): JsonResponse
     {
@@ -167,7 +122,7 @@ class SupportTicketController extends Controller
             'assignee:id,name',
             'replies.user:id,name',
             'replies.attachments',
-            'attachments',
+            'attachments' => fn ($query) => $query->whereNull('reply_id'),
             'histories.changedBy:id,name',
         ])->findOrFail($id);
 
@@ -175,7 +130,7 @@ class SupportTicketController extends Controller
 
         if ($ticket->replies->contains(
             fn ($reply) => $reply->is_internal
-        ) && !$request->user()->can('support.ticket.view-all')) {
+        ) && !$request->user()->can('support.ticket.internal')) {
             $ticket->setRelation(
                 'replies',
                 $ticket->replies->where('is_internal', false)->values()
@@ -230,7 +185,7 @@ class SupportTicketController extends Controller
                     ->firstOrFail();
 
                 $isOwner = (int) $ticket->submitted_by === (int) $user->id;
-                $canManage = $user->can('support.ticket.manage');
+                $canManage = $user->can('support.ticket.manage') && SupportAccess::canView($user, $ticket);
 
                 abort_unless(
                     $isOwner || $canManage,
@@ -321,12 +276,6 @@ class SupportTicketController extends Controller
         Request $request,
         SupportTicket $ticket
     ): void {
-        $user = $request->user();
-
-        $hasAccess = $user->can('support.ticket.view-all')
-            || (int) $ticket->submitted_by === (int) $user->id
-            || (int) $ticket->assigned_to === (int) $user->id;
-
-        abort_unless($hasAccess, 403, 'You cannot access this ticket.');
+        SupportAccess::authorize($request->user(), $ticket);
     }
 }

@@ -16,6 +16,8 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $today = now()->toDateString();
+        $viewAll = $request->user()->can('dashboard.view-all') || $request->user()->can('meal_serve.view');
+        $employeeId = $request->user()->employee_id;
 
         /*
         |--------------------------------------------------------------------------
@@ -24,7 +26,8 @@ class DashboardController extends Controller
         */
 
         $todayMeals = EmployeeMeal::query()
-            ->whereDate('meal_date', $today);
+            ->whereDate('meal_date', $today)
+            ->when(!$viewAll, fn ($query) => $query->where('employee_id', $employeeId ?? 0));
 
         $totalBookings = (clone $todayMeals)->count();
 
@@ -57,8 +60,7 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $totalEmployees = DB::table('employees')
-            ->count();
+        $totalEmployees = $viewAll ? DB::table('employees')->count() : ($employeeId ? 1 : 0);
 
 
         /*
@@ -72,7 +74,7 @@ class DashboardController extends Controller
                 'mealType',
                 'items'
             ])
-            ->whereDate('menu_date', $today)
+            ->whereDate('menu_date', $today)->where('status', 'Approved')
             ->orderBy('meal_type_id')
             ->get();
 
@@ -126,6 +128,7 @@ class DashboardController extends Controller
             )
             ->with('mealType:id,name')
             ->whereDate('meal_date', $today)
+            ->when(!$viewAll, fn ($query) => $query->where('employee_id', $employeeId ?? 0))
             ->groupBy('meal_type_id')
             ->orderBy('meal_type_id')
             ->get();
@@ -144,6 +147,7 @@ class DashboardController extends Controller
                 'items.menuItem'
             ])
             ->whereDate('meal_date', $today)
+            ->when(!$viewAll, fn ($query) => $query->where('employee_id', $employeeId ?? 0))
             ->latest('id')
             ->limit(10)
             ->get();

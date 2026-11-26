@@ -8,100 +8,47 @@ use Illuminate\Routing\Controller;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use Modules\Meeting\Models\Meeting;
-use Modules\Meeting\Models\MeetingAttendance;
+use Modules\Meeting\Services\MeetingAccess;
+use Modules\Meeting\Services\MeetingAttendanceService;
 
 class MeetingAttendanceController extends Controller
 {
-    public function index(Meeting $meeting): JsonResponse
+    public function index(Request $request, Meeting $meeting): JsonResponse
     {
-        return response()->json([
-            'data' => $meeting->attendances()
-                ->with('participant')
-                ->get(),
-        ]);
+        MeetingAccess::authorizeView($request->user(), $meeting);
+        return response()->json(['data' => $meeting->attendances()->with('participant.employee:id,name,code')->get()]);
     }
 
-    public function store(Request $request, Meeting $meeting): JsonResponse
+    public function store(Request $request, Meeting $meeting, MeetingAttendanceService $attendance): JsonResponse
     {
+        MeetingAccess::authorizeManage($request->user(), $meeting);
         $data = $request->validate([
-            'meeting_participant_id' => [
-                'required',
-                'integer',
-                Rule::exists('meeting_participants', 'id')
-                    ->where('meeting_id', $meeting->id),
-            ],
-            'status' => [
-                'required',
-                Rule::in(['present', 'absent', 'late', 'excused']),
-            ],
-            'remarks' => ['nullable', 'string'],
+            'meeting_participant_id' => ['required', 'integer', Rule::exists('meeting_participants', 'id')->where('meeting_id', $meeting->id)],
+            'status' => ['required', Rule::in(['present', 'absent', 'late', 'excused'])],
+            'remarks' => ['nullable', 'string', 'max:4000'],
         ]);
-
-        $attendance = MeetingAttendance::updateOrCreate(
-            [
-                'meeting_id' => $meeting->id,
-                'meeting_participant_id' => $data['meeting_participant_id'],
-            ],
-            [
-                'status' => $data['status'],
-                'remarks' => $data['remarks'] ?? null,
-                'checked_in_at' => in_array(
-                    $data['status'],
-                    ['present', 'late'],
-                    true
-                ) ? now() : null,
-                'marked_by' => $request->user()->getAuthIdentifier(),
-            ]
-        );
-
-        return response()->json([
-            'message' => 'Attendance saved successfully.',
-            'data' => $attendance,
-        ]);
+        $record = DB::transaction(function () use ($meeting, $attendance, $request, $data) {
+            Meeting::whereKey($meeting->id)->lockForUpdate()->firstOrFail();
+            return $attendance->save($meeting, $data['meeting_participant_id'], $data['status'], $data['remarks'] ?? null, $request->user()->id);
+        });
+        return response()->json(['message' => 'Attendance saved successfully.', 'data' => $record]);
     }
 
-    public function bulkUpdate(Request $request, Meeting $meeting): JsonResponse
+    public function bulkUpdate(Request $request, Meeting $meeting, MeetingAttendanceService $attendance): JsonResponse
     {
+        MeetingAccess::authorizeManage($request->user(), $meeting);
         $data = $request->validate([
-            'attendances' => ['required', 'array', 'min:1'],
-            'attendances.*.meeting_participant_id' => [
-                'required',
-                'integer',
-                'distinct',
-                Rule::exists('meeting_participants', 'id')
-                    ->where('meeting_id', $meeting->id),
-            ],
-            'attendances.*.status' => [
-                'required',
-                Rule::in(['present', 'absent', 'late', 'excused']),
-            ],
-            'attendances.*.remarks' => ['nullable', 'string'],
+            'attendances' => ['required', 'array', 'min:1', 'max:1000'],
+            'attendances.*.meeting_participant_id' => ['required', 'integer', 'distinct', Rule::exists('meeting_participants', 'id')->where('meeting_id', $meeting->id)],
+            'attendances.*.status' => ['required', Rule::in(['present', 'absent', 'late', 'excused'])],
+            'attendances.*.remarks' => ['nullable', 'string', 'max:4000'],
         ]);
-
-        DB::transaction(function () use ($data, $meeting, $request) {
+        DB::transaction(function () use ($data, $meeting, $request, $attendance) {
+            Meeting::whereKey($meeting->id)->lockForUpdate()->firstOrFail();
             foreach ($data['attendances'] as $item) {
-                MeetingAttendance::updateOrCreate(
-                    [
-                        'meeting_id' => $meeting->id,
-                        'meeting_participant_id' =>
-                            $item['meeting_participant_id'],
-                    ],
-                    [
-                        'status' => $item['status'],
-                        'remarks' => $item['remarks'] ?? null,
-                        'checked_in_at' => in_array(
-                            $item['status'],
-                            ['present', 'late'],
-                            true
-                        ) ? now() : null,
-                        'marked_by' => $request->user()->getAuthIdentifier(),
-                    ]
-                );
+                $attendance->save($meeting, $item['meeting_participant_id'], $item['status'], $item['remarks'] ?? null, $request->user()->id);
             }
         });
-
-        return response()->json([
-            'message' => 'Attendance updated successfully.',
-        ]);
+        return response()->json(['message' => 'Attendance updated successfully.']);
     }
 }
